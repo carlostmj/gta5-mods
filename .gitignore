@@ -1,0 +1,19 @@
+# Build and Temporary Files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.dll.log
+bin/
+obj/
+*.tmp
+*.log
+*.zip
+
+# Windows
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Visual Studio Code
+.vscode/
