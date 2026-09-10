@@ -1,6 +1,6 @@
 # Ynix Trainer for GTA V (PC Singleplayer)
 
-[![Release](https://img.shields.io/badge/Release-v1.3.0.0-blue.svg)](https://github.com/carlostmj/gta5-mods/releases)
+[![Release](https://img.shields.io/badge/Release-v1.4.0.0-blue.svg)](https://github.com/carlostmj/gta5-mods/releases)
 [![Platform](https://img.shields.io/badge/Platform-GTA%20V%20PC%20Singleplayer-brightgreen.svg)](https://www.gta5-mods.com/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](../../LICENSE)
 
@@ -9,141 +9,90 @@
 ## 🇬🇧 English Description (Mandatory for 5Mods)
 
 ### Short Description
-**Ynix Trainer** is a modern, ultra-modular, and feature-rich script trainer designed specifically for **GTA V PC Singleplayer (Story Mode)**. Built with high performance in mind, it features a native GTA-style UI (using NativeUI), full multi-language localization (English and Portuguese), a built-in Los Santos Customs workshop for tuning anywhere, an anti-despawn vehicle spawner (fixing vanishing DLC cars), tactical AI bodyguards, a skin changer, superpowers (No-Clip, Thermal/Night Vision), scenarios, and digital HUD speedometer.
+**Ynix Trainer** is a high-performance, ultra-modular, and standalone script trainer designed specifically for **GTA V PC Singleplayer (Story Mode)**. It features an in-game Los Santos Customs manual tuning workshop, an anti-despawn vehicle spawner (resolving the vanishing DLC/Add-on car bug), tactical AI bodyguards with full gang squad warfare, complete skin changer (with safe aquatic animal survival), superpowers (No-Clip fly mode with zero-fall damage, Night/Thermal vision), extreme weapons (Teleport Gun, Force Gun, RPG Ammo), drift mode, seatbelt anti-ejection, and full English/Portuguese localization.
 
 ---
 
 ### Summary
 * **Game**: Grand Theft Auto V (PC)
 * **Mode**: Singleplayer / Story Mode Only
-* **Version**: `v1.3.0.0` (First Official GitHub Release)
-* **Author**: Carlos
+* **Version**: `v1.4.0.0`
+* **Author**: Carlos (carlostmj)
 * **Activation Key**: `F4` (Toggle Open/Close, customizable in `Config.ini`)
 
 ---
 
-### Features & Capabilities
-
-1. **🚗 Vehicle Spawner & Anti-Despawn Fix**:
-   - Spawns any original GTA V vehicle categorized cleanly: *Super, Sports, Sports Classics, Muscle, Sedans/SUVs, Motorcycles, Off-Road, Aircraft, Boats/Military*.
-   - **Anti-Despawn Engine**: Resolves the infamous GTA V singleplayer bug where spawned DLC/Add-on cars despawn after 0.2 seconds. Registers decorator `Player_Vehicle`, applies mission entity status, and sets permanent ownership.
-   - **Custom Add-Ons via JSON**: Reads `scripts/YnixTrainer/addons.json` dynamically. Add any custom add-on car without modifying game code!
-   - **Manual Add-On Input**: Spawn any model by typing its name in the in-game input prompt.
-   - **Vehicle Utilities**: Fix & Wash, Vehicle God Mode, Max Performance Tuning, Nitro Boost (Hold SHIFT), Horn Jump, Flip Upright, Open/Close all doors, and Vehicle Delete.
-   - **Drive on Water**: Drive any car or motorcycle across the surface of oceans and rivers.
-   - **Autopilot (Waypoint Navigation)**: Vehicle drives itself automatically through traffic directly to your map waypoint.
-   - **Digital Speedometer HUD**: Real-time HUD displaying speed in **KM/H** and current gear.
-
-2. **🔧 In-Field Los Santos Customs (Manual Tuning Anywhere)**:
-   - Tune and customize every single component of your current car on the fly:
-     - **Performance**: Engine (Levels 1-4), Brakes, Transmission, Suspension, Armor (up to 100%), Turbo, and Xenon Headlights.
-     - **Bodywork**: Spoilers, Front/Rear Bumpers, Side Skirts, Exhausts, Grilles, Hoods, Fenders, Roofs, and Liveries.
-     - **Paint & Colors**: Primary and Secondary colors (Metallic, Matte, Pure Gold, Formula Red, etc.).
-     - **Neon Underglow**: 9 vibrant neon colors with master toggle under the chassis.
-     - **Window Tint (Insulfilm)**: Pure Black, Dark Smoke, Light Smoke, Limo, and Green.
-     - **Wheels & Tires**: Bulletproof tires toggle.
-     - **License Plate**: Plate styles and **custom in-game text input** (put your own name on the plate).
-
-3. **🦸 Superpowers & Vision Modes**:
-   - **No-Clip / Fly Mode**: Fly through the air and pass through walls. Controlled via `W`, `A`, `S`, `D`, `Space` (ascend), `Ctrl` (descend), and `Shift` (speed boost).
-   - **Night Vision**: Military-grade green night vision filter.
-   - **Thermal Vision**: Infrared body heat signature vision.
-
-4. **🎭 Skin Changer**:
-   - Switch models seamlessly:
-     - **Main Characters**: Michael, Franklin, Trevor, Lamar, Lester, Amanda, Jimmy, Tracey, Dave, Solomon.
-     - **Authorities & Military**: SWAT Officer, Marine / Army, Air Force Pilot, FIB Agent, Paramedic, Firefighter, Security Guard, Prison Guard.
-     - **Animals**: Chop, Cat, Chimp, Seagull, Pigeon, Crow, Hen, Deer, Husky, Golden Retriever, German Shepherd, Poodle, Pug, Coyote, Boar, Rabbit, Tiger Shark, Dolphin, Killer Whale.
-     - **Restore Original**: Returns safely to your original story character.
-
-5. **🪖 Tactical Bodyguards**:
-   - Summon armed AI companions: **SWAT Team**, **Military Marine**, or **Secret Agent**.
-   - Bodyguards join the player's group, enter vehicles together, defend the player automatically, and have maximum armor.
-   - **Dismiss All**: Safely dismisses and removes all active guards.
-
-6. **🎬 Animations & Ambient Scenarios**:
-   - Perform scenarios: Smoke cigarette, drink beer, party/dance, sit on ground/picnic, push-ups, yoga, play guitar, cheer, flex muscles, binoculars, sit on chair, guard stance.
-   - **Stop Animation**: Instantly cancels any scenario and returns control.
-
-7. **🔫 Weapons & Combat**:
-   - Give All Weapons with full ammunition, Remove All Weapons, Infinite Ammo (no reload), Explosive Ammo, Fire / Incendiary Ammo, and 1-Hit Kill Super Damage.
-
-8. **📍 Teleportation**:
-   - Teleport to Waypoint, Forward Teleport (3m through locked doors/walls), and famous landmarks (Maze Bank roof, Mount Chiliad, LS Airport, Fort Zancudo, Del Perro Pier, etc.).
-
-9. **☀️ World & Environment**:
-   - Change Weather (Clear, Sunny, Clouds, Rain, Thunder, Snow, Blizzard, Halloween).
-   - Change Time of Day (Morning, Noon, Evening, Midnight) and Freeze Time.
-   - Moon Gravity and Clear Area (clears traffic and pedestrians).
-
-10. **🌐 Multi-Language & Settings**:
-    - Complete runtime language toggle between **Português (pt-BR)** and **English (en-US)**.
-    - Reload `addons.json` on the fly without restarting the game.
+### What's New in v1.4.0.0
+1. **Autopilot v2**: Touch `W`, `S`, `A`, `D`, or `Space` to instantly cancel autopilot and resume manual driving smoothly with no key lockups.
+2. **Gang Squad Warfare**: Spawn full 3-5 member squads (Ballas, Families, Vagos, SWAT, Military) with tactical orders (*Attack My Target, Hold Position, Regroup*) and Gang War Battle Simulator.
+3. **Extreme Weapons**: Teleport Gun (teleport where you shoot), Force Gun (shockwave blast throws vehicles and peds), and real explosive RPG Ammo.
+4. **Vehicle Super Handling**: Drift Mode (reduced rear traction for drifting), Seatbelt (never fly through windshield and no falling off bikes), Super Torque (3x engine multiplier), and Auto-Repair.
+5. **Clean LSC Tuning**: Tuning parts now display clean, clutter-free numbers (`Stock`, `1`, `2`, `3`...) matching your vehicle's mod capabilities.
+6. **Marine Life Protection**: Marine animals (sharks, dolphins, whales) now survive indefinitely on land without suffocating.
+7. **Safe No-Clip**: Disabling No-Clip in mid-air provides temporary invincibility until you safely touch the ground, eliminating fall damage deaths.
+8. **Cinematic Visual Filters**: Matrix (green tint), Noir (Black & White), Dramatic Sunset, and Foggy Silent Hill timecycle modifiers.
 
 ---
 
-### Known Issues & Limitations
-* **Singleplayer Only**: This mod requires ScriptHookV and ScriptHookVDotNet, which automatically disable when GTA Online is launched.
-* **Dependencies Required**: Must have Script Hook V, Script Hook V .NET, and NativeUI installed in your GTA V root directory.
+### Full Features List
 
----
-
-### Requirements & Dependencies
-Make sure you have installed the following prerequisites:
-1. [Script Hook V](http://www.dev-c.com/gtav/scripthookv/) by Alexander Blade (v1.0.3351.0 or newer)
-2. [Community Script Hook V .NET](https://github.com/crosire/scripthookvdotnet/releases) (v2.10.13 or newer)
-3. [NativeUI](https://github.com/Guad/NativeUI/releases) (v1.9 or newer)
+* **🚗 Vehicle Spawner & Anti-Despawn**:
+  - Spawns all original vehicles categorized cleanly + custom add-ons via `addons.json` + manual model name prompt.
+  - Permanent Story Mode persistence decorator (`Player_Vehicle`) preventing DLC vehicle despawns.
+* **🔧 Portable LSC Workshop**:
+  - Clean numbered tuning for Engine, Brakes, Transmission, Suspension, Armor, Turbo, Xenon, Spoilers, Bumpers, Neons, Window Tint, and Custom Plate Text.
+* **🦸 Superpowers & Vision**:
+  - No-Clip (WASD/Shift/Ctrl/Space flight) with ground-safety landing, Night Vision, and Thermal Vision.
+* **🎭 Skin Changer**:
+  - Michael, Franklin, Trevor, story NPCs, law enforcement, and animals with aquatic suffocation protection.
+* **🪖 Tactical Bodyguards & Gangs**:
+  - Individual or full squads, tactical orders, gang warfare standoff, and gang armory.
+* **🔫 Weapons & Combat**:
+  - Teleport Gun, Force Gun, RPG Ammo, Give All, Infinite Ammo, Bottomless Clip (no reload), and 1-Hit Kill.
+* **🎨 Visuals & World**:
+  - Matrix, Noir, Sunset, and Fog filters, Weather and Time control, Moon Gravity, and Clear Area.
 
 ---
 
 ### Installation Instructions (Singleplayer)
-1. Download the latest release from the [Releases](https://github.com/carlostmj/gta5-mods/releases) tab.
-2. Ensure you have installed **Script Hook V**, **ScriptHookVDotNet**, and **NativeUI** in your Grand Theft Auto V root folder (`Grand Theft Auto V\`).
-3. Copy the contents of the `package/scripts/` folder (or from the downloaded zip) directly into your `Grand Theft Auto V\scripts\` folder.
-   - Resulting structure:
-     - `Grand Theft Auto V\scripts\YnixTrainer.dll`
-     - `Grand Theft Auto V\scripts\YnixTrainer\Config.ini`
-     - `Grand Theft Auto V\scripts\YnixTrainer\addons.json`
-     - `Grand Theft Auto V\scripts\YnixTrainer\Languages\pt-BR.ini`
-     - `Grand Theft Auto V\scripts\YnixTrainer\Languages\en-US.ini`
-4. Start GTA V Story Mode.
-5. Press **F4** on your keyboard to open/close the trainer.
+1. Install **Script Hook V**, **ScriptHookVDotNet v2.10.13+**, and **NativeUI v1.9+** into your GTA V directory.
+2. Extract the `scripts` folder from `YnixTrainer-v1.4.0.0.zip` into your Grand Theft Auto V main directory:
+   - `Grand Theft Auto V\scripts\YnixTrainer.dll`
+   - `Grand Theft Auto V\scripts\YnixTrainer\Config.ini`
+   - `Grand Theft Auto V\scripts\YnixTrainer\addons.json`
+   - `Grand Theft Auto V\scripts\YnixTrainer\Languages\pt-BR.ini`
+   - `Grand Theft Auto V\scripts\YnixTrainer\Languages\en-US.ini`
+3. Start GTA V Story Mode and press **F4** to open the menu.
 
 ---
 
 ### Controls
 * **F4**: Open / Close Trainer (Toggle)
-* **Numpad 8 / Up Arrow**: Menu Up
-* **Numpad 2 / Down Arrow**: Menu Down
-* **Numpad 4 / Left Arrow**: Decrease Value / Option Left
-* **Numpad 6 / Right Arrow**: Increase Value / Option Right
+* **Numpad 8 / Up Arrow**: Move Up
+* **Numpad 2 / Down Arrow**: Move Down
+* **Numpad 4 / Left Arrow**: Option Left / Decrease
+* **Numpad 6 / Right Arrow**: Option Right / Increase
 * **Numpad 5 / Enter**: Select
-* **Numpad 0 / Backspace**: Back / Close Submenu
+* **Numpad 0 / Backspace**: Back
+
+---
+
+### Dependencies & Requirements
+* [Script Hook V](http://www.dev-c.com/gtav/scripthookv/) by Alexander Blade
+* [Community Script Hook V .NET](https://github.com/crosire/scripthookvdotnet/releases) by crosire & contributors
+* [NativeUI](https://github.com/Guad/NativeUI/releases) by Guadmaz
+
+---
+
+### Credits
+* **Ynix Trainer Developer**: Carlos (carlostmj)
+* **Script Hook V**: Alexander Blade
+* **ScriptHookVDotNet**: crosire & contributors
+* **NativeUI**: Guadmaz
 
 ---
 
 ## 🇧🇷 Descrição em Português
 
-### Resumo do Mod
-O **Ynix Trainer** é um trainer completo, modular e de altíssimo desempenho para o **GTA V PC (Modo História)**. Possui interface nativa limpa, sistema de tradução dinâmica (Português e Inglês), oficina Los Santos Customs portátil em tempo real, correção de despawn para veículos DLC/Add-on, guarda-costas com inteligência artificial, troca de personagens (skins), superpoderes (No-Clip, Visão Noturna e Térmica), cenários/animações e velocímetro digital.
-
-### Principais Recursos
-* **Spawner com Anti-Despawn**: Corrige carros de DLC que somem sozinhos. Suporta `addons.json` e digitação manual de modelos.
-* **Customização Manual Completa (LSC em Qualquer Lugar)**: Modifique motor, freios, turbo, aerofólio, cor primária/secundária, luzes de neon, insulfilm e digite sua própria placa.
-* **Superpoderes**: Modo voo (No-Clip), visão noturna e visão térmica infravermelha.
-* **Guarda-Costas**: Convoque soldados da SWAT, militares ou agentes que te protegem e entram no seu carro.
-* **Troca de Skins**: Jogue como Michael, Franklin, Trevor, personagens secundários, autoridades ou animais.
-* **Direção na Água e Piloto Automático**: Ande sobre a água e viaje até seu destino no mapa sozinho.
-
----
-
-### Tags
-`Trainer`, `Script`, `Add-On`, `Vehicle`, `Player`, `Weapons`, `Teleport`, `Singleplayer`, `NativeUI`
-
----
-
-### Credits
-* **Ynix Trainer Author**: Carlos
-* **Script Hook V**: Alexander Blade
-* **ScriptHookVDotNet**: crosire & contributors
-* **NativeUI Library**: Guadmaz
+### Resumo
+O **Ynix Trainer v1.4.0.0** é um trainer completo, modular e autônomo para o Modo História do GTA V no PC. Conta com oficina LSC portátil integrada, correção anti-despawn definitiva para carros de DLC/Add-on, esquadrões de gangues com ordens táticas e modo guerra urbana, armas especiais (Teleport Gun, Force Gun, RPG Ammo), modo drift, cinto de segurança anti-ejeção do pára-brisa, animais aquáticos que sobrevivem em terra, No-Clip seguro sem dano de queda, filtros de câmera cinematográficos e velocímetro digital em KM/H.

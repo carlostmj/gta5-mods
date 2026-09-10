@@ -15,6 +15,7 @@ namespace YnixTrainer.Modules
         private bool _noClip = false;
         private bool _nightVision = false;
         private bool _thermalVision = false;
+        private bool _fallProtectionActive = false;
 
         public void Initialize(UIMenu mainMenu, MenuPool menuPool)
         {
@@ -31,9 +32,20 @@ namespace YnixTrainer.Modules
                     player.HasCollision = !_noClip;
                     Function.Call(Hash.SET_ENTITY_COLLISION, player.Handle, !_noClip, true);
                     player.FreezePosition = _noClip;
-                    if (!_noClip)
+
+                    if (_noClip)
                     {
-                        player.IsInvincible = false;
+                        player.IsInvincible = true;
+                        _fallProtectionActive = false;
+                    }
+                    else
+                    {
+                        // Fall protection: protect player until they safely touch ground
+                        _fallProtectionActive = true;
+                        player.CanRagdoll = false;
+                        Function.Call(Hash.SET_PED_CAN_RAGDOLL, player.Handle, false);
+                        Function.Call(Hash.SET_ENTITY_PROOFS, player.Handle, true, true, true, true, true, true, true, true);
+                        player.IsInvincible = true;
                     }
                 }
             };
@@ -85,6 +97,18 @@ namespace YnixTrainer.Modules
 
                 player.Position = newPos;
                 player.Heading = GameplayCamera.Rotation.Z;
+            }
+            else if (_fallProtectionActive)
+            {
+                // Deactivate fall protection only when safely on ground or in vehicle/water
+                if (!player.IsInAir || player.HeightAboveGround < 1.5f || player.IsInWater || player.IsInVehicle())
+                {
+                    _fallProtectionActive = false;
+                    player.CanRagdoll = true;
+                    Function.Call(Hash.SET_PED_CAN_RAGDOLL, player.Handle, true);
+                    Function.Call(Hash.SET_ENTITY_PROOFS, player.Handle, false, false, false, false, false, false, false, false);
+                    player.IsInvincible = false;
+                }
             }
         }
     }

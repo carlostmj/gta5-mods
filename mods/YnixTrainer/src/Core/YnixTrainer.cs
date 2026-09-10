@@ -15,6 +15,7 @@ namespace YnixTrainer
         private UIMenu _mainMenu;
         private List<IYnixModule> _modules;
         private Keys _toggleKey = Keys.F4;
+        private int _lastToggleTime = 0;
 
         public YnixTrainerScript()
         {
@@ -37,7 +38,7 @@ namespace YnixTrainer
                 _menuPool.ResetCursorOnOpen = false;
 
                 string title = Localization.Get("General", "MenuTitle", "Ynix Trainer");
-                string subtitle = Localization.Get("General", "MenuSubtitle", "v1.3.0.0");
+                string subtitle = Localization.Get("General", "MenuSubtitle", "v1.4.0.0");
                 _mainMenu = new UIMenu(title, subtitle);
                 _menuPool.Add(_mainMenu);
 
@@ -72,7 +73,7 @@ namespace YnixTrainer
 
                 Interval = 0;
 
-                UI.Notify("~b~Ynix Trainer v1.3.0.0 ~w~carregado!\nPressione ~g~" + _toggleKey.ToString() + " ~w~para abrir.");
+                UI.Notify("~b~Ynix Trainer v1.4.0.0 ~w~carregado!\nPressione ~g~" + _toggleKey.ToString() + " ~w~para abrir.");
             }
             catch (Exception ex)
             {
@@ -110,6 +111,11 @@ namespace YnixTrainer
         {
             if (e.KeyCode == _toggleKey)
             {
+                // Debounce to prevent menu flickering
+                int currentTime = Game.GameTime;
+                if (currentTime - _lastToggleTime < 300) return;
+                _lastToggleTime = currentTime;
+
                 if (_menuPool != null)
                 {
                     if (_menuPool.IsAnyMenuOpen())

@@ -78,9 +78,9 @@ namespace YnixTrainer.Modules
             AddSkinOption(animalsMenu, "Coiote", "a_c_coyote");
             AddSkinOption(animalsMenu, "Javali", "a_c_boar");
             AddSkinOption(animalsMenu, "Coelho", "a_c_rabbit_01");
-            AddSkinOption(animalsMenu, "Tubarão Tigre", "a_c_sharktiger");
-            AddSkinOption(animalsMenu, "Golfinho", "a_c_dolphin");
-            AddSkinOption(animalsMenu, "Orca (Baleia Assassina)", "a_c_killerwhale");
+            AddSkinOption(animalsMenu, "Tubarão Tigre (Imune fora d'água)", "a_c_sharktiger");
+            AddSkinOption(animalsMenu, "Golfinho (Imune fora d'água)", "a_c_dolphin");
+            AddSkinOption(animalsMenu, "Orca / Baleia (Imune fora d'água)", "a_c_killerwhale");
         }
 
         private void AddSkinOption(UIMenu parent, string displayName, string modelName)
@@ -97,13 +97,42 @@ namespace YnixTrainer.Modules
         {
             try
             {
+                Ped player = Game.Player.Character;
+                if (player == null || !player.Exists()) return;
+
+                // Safety check: Cannot change skin while dead!
+                if (player.IsDead || player.Health <= 0)
+                {
+                    UI.Notify("~r~Você não pode mudar de skin enquanto estiver morto!");
+                    return;
+                }
+
                 Model model = new Model(modelName);
                 model.Request(2500);
                 if (model.IsInCdImage && model.IsValid)
                 {
+                    // Heal before changing
+                    player.Health = player.MaxHealth;
+                    player.ClearBloodDamage();
+
                     Function.Call(Hash.SET_PLAYER_MODEL, Game.Player.Handle, model.Hash);
                     Function.Call(Hash.SET_PED_DEFAULT_COMPONENT_VARIATION, Game.Player.Character.Handle);
-                    UI.Notify("~g~Skin alterada para ~w~" + displayName);
+
+                    // Aquatic animals protection
+                    bool isAquatic = modelName.Contains("shark") || modelName.Contains("dolphin") || modelName.Contains("killerwhale");
+                    if (isAquatic)
+                    {
+                        Ped newPed = Game.Player.Character;
+                        Function.Call(Hash.SET_PED_DIES_IN_WATER, newPed.Handle, false);
+                        Function.Call(Hash.SET_PED_DIES_INSTANTLY_IN_WATER, newPed.Handle, false);
+                        Function.Call(Hash.SET_PED_MAX_TIME_UNDERWATER, newPed.Handle, 999999.0f);
+                        newPed.IsInvincible = true;
+                        UI.Notify("~b~Modo aquático: ~w~" + displayName + " é imune à asfixia em terra firme!");
+                    }
+                    else
+                    {
+                        UI.Notify("~g~Skin alterada para ~w~" + displayName);
+                    }
                 }
                 else
                 {
@@ -121,10 +150,21 @@ namespace YnixTrainer.Modules
         {
             try
             {
+                Ped player = Game.Player.Character;
+                if (player == null || !player.Exists()) return;
+
+                if (player.IsDead || player.Health <= 0)
+                {
+                    UI.Notify("~r~Você não pode mudar de skin enquanto estiver morto!");
+                    return;
+                }
+
                 Model model = new Model(modelHash);
                 model.Request(2500);
                 if (model.IsInCdImage && model.IsValid)
                 {
+                    player.Health = player.MaxHealth;
+                    player.ClearBloodDamage();
                     Function.Call(Hash.SET_PLAYER_MODEL, Game.Player.Handle, model.Hash);
                     Function.Call(Hash.SET_PED_DEFAULT_COMPONENT_VARIATION, Game.Player.Character.Handle);
                     UI.Notify("~g~Skin alterada para ~w~" + displayName);
@@ -141,8 +181,6 @@ namespace YnixTrainer.Modules
             }
         }
 
-        public void OnTick()
-        {
-        }
+        public void OnTick() { }
     }
 }

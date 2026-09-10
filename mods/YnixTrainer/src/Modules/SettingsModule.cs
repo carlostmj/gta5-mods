@@ -38,7 +38,7 @@ namespace YnixTrainer.Modules
             settingsMenu.AddItem(reloadAddonsItem);
 
             // Version info
-            var verItem = new UIMenuItem(Localization.Get("Settings", "VersionLabel", "Versão: v1.3.0.0"), "Versão oficial do Ynix Trainer");
+            var verItem = new UIMenuItem(Localization.Get("Settings", "VersionLabel", "Versão: v1.4.0.0"), "Versão oficial do Ynix Trainer");
             settingsMenu.AddItem(verItem);
 
             // Creator info

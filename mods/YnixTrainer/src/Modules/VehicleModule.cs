@@ -19,7 +19,10 @@ namespace YnixTrainer.Modules
         private bool _driveOnWater = false;
         private bool _autopilot = false;
         private bool _speedometer = false;
-        private UIMenuCheckboxItem _autopilotItem;
+        private bool _driftMode = false;
+        private bool _seatbelt = true;
+        private bool _autoRepair = false;
+        private bool _superTorque = false;
 
         public void Initialize(UIMenu mainMenu, MenuPool menuPool)
         {
@@ -44,6 +47,11 @@ namespace YnixTrainer.Modules
             };
             vehMenu.AddItem(fixItem);
 
+            // Auto Repair
+            var autoRepItem = new UIMenuCheckboxItem("Auto-Reparo Contínuo", _autoRepair, "Conserta o veículo instantaneamente sempre que sofrer dano");
+            autoRepItem.CheckboxEvent += (sender, state) => { _autoRepair = state; };
+            vehMenu.AddItem(autoRepItem);
+
             // Vehicle God Mode
             var godItem = new UIMenuCheckboxItem(Localization.Get("Vehicle", "VehicleGodMode", "Veículo Invencível"), _vehicleGodMode, Localization.Get("Vehicle", "VehicleGodModeDesc", "Indestrutível"));
             godItem.CheckboxEvent += (sender, state) =>
@@ -57,6 +65,20 @@ namespace YnixTrainer.Modules
                 }
             };
             vehMenu.AddItem(godItem);
+
+            // Seatbelt (Anti-Fly through windshield & anti-fall from bikes)
+            var seatItem = new UIMenuCheckboxItem("Cinto de Segurança (Anti-Ejeção)", _seatbelt, "Nunca é ejetado pelo pára-brisa em batidas e não cai da moto");
+            seatItem.CheckboxEvent += (sender, state) =>
+            {
+                _seatbelt = state;
+                Ped player = Game.Player.Character;
+                if (player != null && player.Exists())
+                {
+                    Function.Call(Hash.SET_PED_CONFIG_FLAG, player.Handle, 32, !_seatbelt);
+                    Function.Call(Hash.SET_PED_CAN_BE_KNOCKED_OFF_VEHICLE, player.Handle, _seatbelt ? 1 : 0);
+                }
+            };
+            vehMenu.AddItem(seatItem);
 
             // Max Tuning
             var tuneItem = new UIMenuItem(Localization.Get("Vehicle", "MaxTuning", "Tunar Veículo ao Máximo"), Localization.Get("Vehicle", "MaxTuningDesc", "Melhorias máximas de desempenho"));
@@ -95,6 +117,16 @@ namespace YnixTrainer.Modules
             boostItem.CheckboxEvent += (sender, state) => { _speedBoost = state; };
             vehMenu.AddItem(boostItem);
 
+            // Super Torque / Engine Multiplier
+            var torqueItem = new UIMenuCheckboxItem("Super Motor (Torque 3x)", _superTorque, "Multiplica o torque do motor para aceleração brutal");
+            torqueItem.CheckboxEvent += (sender, state) => { _superTorque = state; };
+            vehMenu.AddItem(torqueItem);
+
+            // Drift Mode
+            var driftItem = new UIMenuCheckboxItem("Modo Drift", _driftMode, "Reduz a aderência traseira para manobras de drift fluidas");
+            driftItem.CheckboxEvent += (sender, state) => { _driftMode = state; };
+            vehMenu.AddItem(driftItem);
+
             // Horn Jump
             var hornItem = new UIMenuCheckboxItem(Localization.Get("Vehicle", "HornJump", "Pulo com Buzina"), _hornJump, Localization.Get("Vehicle", "HornJumpDesc", "Buzine para pular"));
             hornItem.CheckboxEvent += (sender, state) => { _hornJump = state; };
@@ -105,39 +137,38 @@ namespace YnixTrainer.Modules
             waterItem.CheckboxEvent += (sender, state) => { _driveOnWater = state; };
             vehMenu.AddItem(waterItem);
 
-            // Autopilot
-            _autopilotItem = new UIMenuCheckboxItem(Localization.Get("Vehicle", "Autopilot", "Piloto Automático (Waypoint)"), _autopilot, Localization.Get("Vehicle", "AutopilotDesc", "Dirige sozinho até o destino marcado"));
-            _autopilotItem.CheckboxEvent += (sender, state) =>
+            // Autopilot v2
+            var autoItem = new UIMenuItem(Localization.Get("Vehicle", "Autopilot", "Piloto Automático (Waypoint)"), "Inicia a condução até o marcador. Pressione W, S ou Espaço para cancelar.");
+            autoItem.Activated += (sender, selected) =>
             {
                 Ped player = Game.Player.Character;
-                if (state)
+                if (!player.IsInVehicle())
                 {
-                    if (!player.IsInVehicle())
-                    {
-                        _autopilotItem.Checked = false;
-                        UI.Notify("~r~Você precisa estar dentro de um veículo!");
-                        return;
-                    }
-                    if (!Game.IsWaypointActive)
-                    {
-                        _autopilotItem.Checked = false;
-                        UI.Notify("~r~Marque um destino no mapa (Waypoint) primeiro!");
-                        return;
-                    }
+                    UI.Notify("~r~Você precisa estar dentro de um veículo!");
+                    return;
+                }
+                if (!Game.IsWaypointActive)
+                {
+                    UI.Notify("~r~Marque um destino no mapa (Waypoint) primeiro!");
+                    return;
+                }
+
+                if (_autopilot)
+                {
+                    _autopilot = false;
+                    player.Task.ClearAll();
+                    UI.Notify("~y~Piloto automático desativado.");
+                }
+                else
+                {
                     _autopilot = true;
                     Vector3 wp = World.GetWaypointPosition();
                     Vehicle v = player.CurrentVehicle;
                     player.Task.DriveTo(v, wp, 15.0f, 40.0f, 786603);
-                    UI.Notify("~g~Piloto automático iniciado até o destino!");
-                }
-                else
-                {
-                    _autopilot = false;
-                    player.Task.ClearAll();
-                    UI.Notify("~y~Piloto automático cancelado.");
+                    UI.Notify("~g~Piloto automático iniciado!\nPressione ~y~W, S ou Espaço ~w~para assumir o volante.");
                 }
             };
-            vehMenu.AddItem(_autopilotItem);
+            vehMenu.AddItem(autoItem);
 
             // Speedometer
             var speedoItem = new UIMenuCheckboxItem(Localization.Get("Vehicle", "Speedometer", "Velocímetro Digital (KM/H)"), _speedometer, Localization.Get("Vehicle", "SpeedometerDesc", "Exibe velocidade e marcha na tela"));
@@ -203,7 +234,6 @@ namespace YnixTrainer.Modules
             // -------------------------------------------------------------
             var spawnerMenu = menuPool.AddSubMenu(vehMenu, Localization.Get("Vehicle", "SpawnVehicle", "Spawmar Veículo"));
 
-            // 1. Add-Ons from JSON
             AddonManager.Load();
             var addonMenu = menuPool.AddSubMenu(spawnerMenu, Localization.Get("Vehicle", "SpawnAddonMenu", "Meus Carros Add-On (JSON)"));
             if (AddonManager.Addons.Count > 0)
@@ -222,7 +252,6 @@ namespace YnixTrainer.Modules
                 addonMenu.AddItem(new UIMenuItem("Nenhum veículo em addons.json", "Edite scripts/YnixTrainer/addons.json"));
             }
 
-            // 2. Input Box for Add-Ons
             var addonInputItem = new UIMenuItem(Localization.Get("Vehicle", "SpawnAddonInput", "Digitar Modelo Add-On"), Localization.Get("Vehicle", "SpawnAddonInputDesc", "Digite qualquer nome"));
             addonInputItem.Activated += (sender, selected) =>
             {
@@ -234,10 +263,8 @@ namespace YnixTrainer.Modules
             };
             spawnerMenu.AddItem(addonInputItem);
 
-            // 3. Original GTA V Categories Submenu
             var origCatsMenu = menuPool.AddSubMenu(spawnerMenu, Localization.Get("Vehicle", "SpawnCategories", "Categorias Originais do GTA V"));
 
-            // Super
             AddCategoryMenu(origCatsMenu, menuPool, "Super", new[]
             {
                 "adder", "autarch", "banshee2", "bullet", "cheetah", "cyclone", "deveste", "entity2", "entityxf",
@@ -247,7 +274,6 @@ namespace YnixTrainer.Modules
                 "vacca", "vagner", "visione", "voltic", "xa21", "zentorno", "zorrusso"
             });
 
-            // Sports
             AddCategoryMenu(origCatsMenu, menuPool, "Esportivos (Sports)", new[]
             {
                 "alpha", "banshee", "bestiagts", "blista2", "buffalo", "buffalo2", "buffalo3", "carbonizzare", "comet2",
@@ -259,7 +285,6 @@ namespace YnixTrainer.Modules
                 "streiter", "sugoi", "sultan", "surano", "tropos", "verlierer2"
             });
 
-            // Sports Classics
             AddCategoryMenu(origCatsMenu, menuPool, "Clássicos Esportivos", new[]
             {
                 "arwing", "casco", "cheetah2", "coquette2", "coquette3", "deluxo", "dynasty", "gt500", "infernusclassic",
@@ -268,7 +293,6 @@ namespace YnixTrainer.Modules
                 "tornadob", "turismo2", "viseris", "ztype", "zion3"
             });
 
-            // Muscle
             AddCategoryMenu(origCatsMenu, menuPool, "Muscle Cars", new[]
             {
                 "blade", "buccaneer", "buccaneer2", "chino", "chino2", "clique", "coquette3", "deviant", "dominator",
@@ -279,7 +303,6 @@ namespace YnixTrainer.Modules
                 "tulip", "vamos", "vigilante", "virgo", "virgo2", "virgo3", "voodoo", "voodoo2", "yosemite", "yosemite2"
             });
 
-            // Sedans & Coupes & SUVs
             AddCategoryMenu(origCatsMenu, menuPool, "Sedans, Coupés e SUVs", new[]
             {
                 "asea", "asterope", "cog55", "cognoscenti", "emperor", "fugitive", "glendale", "ingot", "intruder",
@@ -291,7 +314,6 @@ namespace YnixTrainer.Modules
                 "patriot2", "radi", "rebla", "rocoto", "seminole", "serrano", "toros", "xls"
             });
 
-            // Motorcycles & Cycles
             AddCategoryMenu(origCatsMenu, menuPool, "Motos e Quadriciclos", new[]
             {
                 "akuma", "avarus", "bagger", "bati", "bati2", "bf400", "carbonrs", "chimera", "cliffhanger", "daemon",
@@ -303,7 +325,6 @@ namespace YnixTrainer.Modules
                 "tribike2", "tribike3"
             });
 
-            // Off-Road
             AddCategoryMenu(origCatsMenu, menuPool, "Off-Road", new[]
             {
                 "bfinjection", "bifta", "blazer", "blazer2", "blazer3", "blazer4", "blazer5", "bodhi2", "brawler", "bruiser",
@@ -313,7 +334,6 @@ namespace YnixTrainer.Modules
                 "technical", "technical2", "technical3", "trophytruck", "trophytruck2", "vagrant", "wastelander", "zhaba"
             });
 
-            // Helicopters & Planes
             AddCategoryMenu(origCatsMenu, menuPool, "Helicópteros e Aviões", new[]
             {
                 "akula", "annihilator", "buzzard", "buzzard2", "cargobob", "cargobob2", "cargobob3", "cargobob4", "frogger",
@@ -325,7 +345,6 @@ namespace YnixTrainer.Modules
                 "vestra", "volatol"
             });
 
-            // Boats & Military / Emergency
             AddCategoryMenu(origCatsMenu, menuPool, "Barcos, Militares e Emergência", new[]
             {
                 "dinghy", "dinghy2", "dinghy3", "dinghy4", "jetmax", "marquis", "seashark", "seashark2", "seashark3",
@@ -344,10 +363,7 @@ namespace YnixTrainer.Modules
             {
                 string m = modelName;
                 var item = new UIMenuItem(m.ToUpper(), "Spawmar " + m);
-                item.Activated += (sender, selected) =>
-                {
-                    SpawnVehicle(m);
-                };
+                item.Activated += (sender, selected) => { SpawnVehicle(m); };
                 catMenu.AddItem(item);
             }
         }
@@ -365,7 +381,6 @@ namespace YnixTrainer.Modules
                     Vehicle v = World.CreateVehicle(model, spawnPos, player.Heading);
                     if (v != null && v.Exists())
                     {
-                        // Anti-Despawn: mission entity, persistent, owned by player, registered decorator
                         Function.Call(Hash.SET_ENTITY_AS_MISSION_ENTITY, v.Handle, true, true);
                         v.IsPersistent = true;
                         Function.Call(Hash.SET_VEHICLE_HAS_BEEN_OWNED_BY_PLAYER, v.Handle, true);
@@ -404,6 +419,13 @@ namespace YnixTrainer.Modules
             Ped player = Game.Player.Character;
             if (player == null || !player.Exists()) return;
 
+            // Seatbelt
+            if (_seatbelt)
+            {
+                Function.Call(Hash.SET_PED_CONFIG_FLAG, player.Handle, 32, false);
+                Function.Call(Hash.SET_PED_CAN_BE_KNOCKED_OFF_VEHICLE, player.Handle, 1);
+            }
+
             if (player.IsInVehicle())
             {
                 Vehicle v = player.CurrentVehicle;
@@ -416,9 +438,24 @@ namespace YnixTrainer.Modules
                         v.Health = 1000;
                     }
 
+                    if (_autoRepair && (v.Health < 1000 || v.EngineHealth < 1000))
+                    {
+                        v.Repair();
+                    }
+
                     if (_speedBoost && Game.IsKeyPressed(Keys.ShiftKey))
                     {
                         v.ApplyForce(v.ForwardVector * 1.5f);
+                    }
+
+                    if (_superTorque && Game.IsControlPressed(0, GTA.Control.VehicleAccelerate))
+                    {
+                        v.EnginePowerMultiplier = 2.5f;
+                    }
+
+                    if (_driftMode)
+                    {
+                        Function.Call(Hash.SET_VEHICLE_REDUCE_GRIP, v.Handle, true);
                     }
 
                     if (_hornJump && Game.IsControlJustPressed(0, GTA.Control.VehicleHorn))
@@ -453,13 +490,25 @@ namespace YnixTrainer.Modules
                         new UIText(text, new System.Drawing.Point(UI.WIDTH - 180, UI.HEIGHT - 70), 0.6f, System.Drawing.Color.FromArgb(255, 0, 230, 255), GTA.Font.ChaletComprimeCologne, false, true, true).Draw();
                     }
 
-                    // Autopilot Waypoint arrival check
+                    // Autopilot v2 - Safe cancellation check
                     if (_autopilot)
                     {
-                        if (!Game.IsWaypointActive)
+                        // Check if player touched controls
+                        if (Game.IsControlJustPressed(0, GTA.Control.VehicleAccelerate) ||
+                            Game.IsControlJustPressed(0, GTA.Control.VehicleBrake) ||
+                            Game.IsControlJustPressed(0, GTA.Control.VehicleHandbrake) ||
+                            Game.IsControlJustPressed(0, GTA.Control.VehicleMoveLeftRight) ||
+                            Game.IsKeyPressed(Keys.W) || Game.IsKeyPressed(Keys.S) ||
+                            Game.IsKeyPressed(Keys.A) || Game.IsKeyPressed(Keys.D) ||
+                            Game.IsKeyPressed(Keys.Space))
                         {
                             _autopilot = false;
-                            if (_autopilotItem != null) _autopilotItem.Checked = false;
+                            player.Task.ClearAll();
+                            UI.Notify("~g~Controle manual do veículo reassumido.");
+                        }
+                        else if (!Game.IsWaypointActive)
+                        {
+                            _autopilot = false;
                             player.Task.ClearAll();
                             UI.Notify("~y~Piloto automático finalizado: sem destino.");
                         }
@@ -470,7 +519,6 @@ namespace YnixTrainer.Modules
                             if (dist < 25.0f)
                             {
                                 _autopilot = false;
-                                if (_autopilotItem != null) _autopilotItem.Checked = false;
                                 player.Task.ClearAll();
                                 v.HandbrakeOn = true;
                                 UI.Notify("~g~Você chegou ao seu destino!");
@@ -484,7 +532,6 @@ namespace YnixTrainer.Modules
                 if (_autopilot)
                 {
                     _autopilot = false;
-                    if (_autopilotItem != null) _autopilotItem.Checked = false;
                 }
             }
         }

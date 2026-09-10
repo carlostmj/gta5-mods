@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using GTA;
@@ -100,10 +100,10 @@ namespace YnixTrainer.Modules
             };
             wheelsMenu.AddItem(bpTires);
 
-            // 7. License Plate
+            // 7. License Plates
             var plateMenu = menuPool.AddSubMenu(customMenu, Localization.Get("Customization", "PlateMenu", "Placa do Veículo"));
-            var plateStyles = new List<dynamic> { "Azul no Branco 1", "Amarelo no Preto", "Amarelo no Azul", "Azul no Branco 2", "Azul no Branco 3", "North Yankton" };
-            var plateItem = new UIMenuListItem(Localization.Get("Customization", "PlateStyle", "Estilo da Placa"), plateStyles, 0, "Estilo visual da placa");
+            var plateStyles = new List<dynamic> { "Azul no Branco", "Amarelo no Preto", "Amarelo no Azul", "Azul no Branco 2", "North Yankton", "Preto San Andreas" };
+            var plateItem = new UIMenuListItem(Localization.Get("Customization", "PlateStyle", "Estilo da Placa"), plateStyles, 0, "Altera o modelo da placa");
             plateItem.OnListChanged += (sender, index) =>
             {
                 Vehicle v = GetPlayerVehicle();
@@ -120,11 +120,11 @@ namespace YnixTrainer.Modules
                 Vehicle v = GetPlayerVehicle();
                 if (v != null)
                 {
-                    string text = Game.GetUserInput(8);
-                    if (!string.IsNullOrEmpty(text))
+                    string input = Game.GetUserInput(8);
+                    if (!string.IsNullOrEmpty(input))
                     {
-                        v.NumberPlate = text.Trim().ToUpper();
-                        UI.Notify("~g~Placa alterada para: " + v.NumberPlate);
+                        v.NumberPlate = input.ToUpper();
+                        UI.Notify("~g~Placa alterada para: ~w~" + input.ToUpper());
                     }
                 }
             };
@@ -146,18 +146,21 @@ namespace YnixTrainer.Modules
 
         private void AddModListItem(UIMenu menu, string label, VehicleMod mod)
         {
+            // Clean numbers: Stock, 1, 2, 3, 4, 5...
             var options = new List<dynamic>();
-            for (int i = 0; i <= 25; i++)
+            options.Add("Stock");
+            for (int i = 1; i <= 25; i++)
             {
-                options.Add(i == 0 ? "Original (Stock)" : "Opção " + i);
+                options.Add(i.ToString());
             }
+
             var item = new UIMenuListItem(label, options, 0, "Altera " + label);
             item.OnListChanged += (sender, index) =>
             {
                 Vehicle v = GetPlayerVehicle();
                 if (v != null)
                 {
-                    int modIndex = index - 1;
+                    int modIndex = index - 1; // 0 -> Stock (-1 in GTA)
                     v.SetMod(mod, modIndex, false);
                 }
             };
@@ -178,27 +181,18 @@ namespace YnixTrainer.Modules
             menu.AddItem(item);
         }
 
-        private void AddColorSelector(UIMenu menu, string label, bool primary)
+        private void AddColorSelector(UIMenu menu, string label, bool isPrimary)
         {
-            var colorNames = new List<dynamic>
-            {
-                "Preto Metálico", "Branco Metálico", "Vermelho Fórmula", "Azul Metálico",
-                "Amarelo Fosco", "Verde Lima", "Laranja Metálico", "Ouro Puro"
-            };
-            var colorValues = new[]
-            {
-                VehicleColor.MetallicBlack, VehicleColor.MetallicWhite, VehicleColor.MetallicFormulaRed,
-                VehicleColor.MetallicBlue, VehicleColor.MatteYellow, VehicleColor.MatteLimeGreen,
-                VehicleColor.MetallicOrange, VehicleColor.PureGold
-            };
+            var colorNames = new List<dynamic> { "Preto", "Branco", "Vermelho", "Azul", "Amarelo", "Verde Lima", "Laranja", "Ouro Puro", "Prata", "Roxo" };
+            var colorValues = new[] { VehicleColor.MetallicBlack, VehicleColor.PureWhite, VehicleColor.MetallicFormulaRed, VehicleColor.MetallicBlue, VehicleColor.MetallicTaxiYellow, VehicleColor.MatteLimeGreen, VehicleColor.MetallicOrange, VehicleColor.PureGold, VehicleColor.MetallicSilver, VehicleColor.MetallicSpinnakerBlue };
 
-            var item = new UIMenuListItem(label, colorNames, 0, "Altera a cor do veículo");
+            var item = new UIMenuListItem(label, colorNames, 0, "Altera " + label);
             item.OnListChanged += (sender, index) =>
             {
                 Vehicle v = GetPlayerVehicle();
                 if (v != null)
                 {
-                    if (primary) v.PrimaryColor = colorValues[index];
+                    if (isPrimary) v.PrimaryColor = colorValues[index];
                     else v.SecondaryColor = colorValues[index];
                 }
             };
