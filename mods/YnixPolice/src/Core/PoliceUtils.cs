@@ -67,6 +67,26 @@ namespace YnixPolice.Core
             return closest;
         }
 
+        public static Ped FindClosestOnFootPoliceOfficer(GTA.Math.Vector3 pos, float radius)
+        {
+            Ped[] peds = World.GetNearbyPeds(pos, radius);
+            Ped closest = null;
+            float minD = float.MaxValue;
+            foreach (var p in peds)
+            {
+                if (IsCop(p) && !p.IsDead && !p.IsInVehicle())
+                {
+                    float d = World.GetDistance(pos, p.Position);
+                    if (d < minD)
+                    {
+                        minD = d;
+                        closest = p;
+                    }
+                }
+            }
+            return closest;
+        }
+
         public static Vehicle FindClosestPoliceVehicle(GTA.Math.Vector3 pos, float radius)
         {
             Vehicle[] vehs = World.GetNearbyVehicles(pos, radius);
