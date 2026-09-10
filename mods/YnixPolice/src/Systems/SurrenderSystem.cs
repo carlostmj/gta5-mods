@@ -7,12 +7,20 @@ using YnixPolice.Core;
 
 namespace YnixPolice.Systems
 {
+    public enum SurrenderState
+    {
+        Idle,
+        HandsUpWaitingCop,
+        CopCuffingPlayer,
+        FadingToStation
+    }
+
     public class SurrenderSystem
     {
-        private static bool _isSurrendering = false;
-        private static int _surrenderTime = 0;
+        public static SurrenderState State = SurrenderState.Idle;
         private static Ped _arrestingOfficer = null;
-        private static int _fadeStage = 0;
+        private static int _stateStartTime = 0;
+        private static int _animLoopTime = 0;
 
         public void OnTick()
         {
@@ -21,100 +29,172 @@ namespace YnixPolice.Systems
             Ped player = Game.Player.Character;
             if (player == null || !player.Exists() || player.IsDead)
             {
-                _isSurrendering = false;
+                Reset();
                 return;
             }
 
-            if (_isSurrendering)
+            switch (State)
             {
-                HandleSurrenderProcess(player);
-                return;
+                case SurrenderState.Idle:
+                    HandleIdleState(player);
+                    break;
+
+                case SurrenderState.HandsUpWaitingCop:
+                    HandleHandsUpWaiting(player);
+                    break;
+
+                case SurrenderState.CopCuffingPlayer:
+                    HandleCuffing(player);
+                    break;
+
+                case SurrenderState.FadingToStation:
+                    HandleFading(player);
+                    break;
             }
+        }
 
-            // Available during 1, 2 or 3 stars (even on foot or inside vehicle)
-            if (Game.Player.WantedLevel > 0 && Game.Player.WantedLevel <= 3)
+        private void HandleIdleState(Ped player)
+        {
+            // Only show surrender prompt if player has wanted level AND an alive cop is within 30m!
+            if (Game.Player.WantedLevel > 0 && Game.Player.WantedLevel <= 3 && !player.IsInVehicle())
             {
-                // Show hint on screen
-                string hint = string.Format("Segure [{0}] para Erguer as Mãos e Render-se", ConfigManager.SurrenderKey.ToString());
-                new UIText(hint, new System.Drawing.Point(UI.WIDTH / 2, UI.HEIGHT - 65), 0.4f, System.Drawing.Color.FromArgb(220, 255, 255, 255), GTA.Font.ChaletComprimeCologne, true, false, true).Draw();
-
-                if (Game.IsKeyPressed(ConfigManager.SurrenderKey))
+                Ped nearbyCop = PoliceUtils.FindClosestPoliceOfficer(player.Position, 30.0f);
+                if (nearbyCop != null)
                 {
-                    if (player.IsInVehicle())
-                    {
-                        player.Task.LeaveVehicle(player.CurrentVehicle, false);
-                    }
+                    // Show prompt on screen
+                    string hint = string.Format("~y~POLÍCIA PRÓXIMA ~w~| Pressione ~g~[{0}]~w~ para Mãos ao Alto e Render-se", ConfigManager.SurrenderKey.ToString());
+                    new UIText(hint, new System.Drawing.Point(UI.WIDTH / 2, UI.HEIGHT - 65), 0.42f, System.Drawing.Color.White, GTA.Font.ChaletComprimeCologne, true, false, true).Draw();
 
-                    Ped officer = FindClosestPoliceOfficer(player.Position, 50.0f);
-                    TriggerSurrender(player, officer);
+                    if (Game.IsKeyPressed(ConfigManager.SurrenderKey))
+                    {
+                        StartSurrender(player, nearbyCop);
+                    }
                 }
             }
         }
 
-        public static void TriggerSurrender(Ped player, Ped officer)
+        public static void StartSurrender(Ped player, Ped officer)
         {
-            _isSurrendering = true;
-            _surrenderTime = Game.GameTime;
+            if (officer == null || !officer.Exists())
+            {
+                UI.Notify("~r~Nenhum policial por perto para efetuar a rendição!");
+                return;
+            }
+
+            State = SurrenderState.HandsUpWaitingCop;
             _arrestingOfficer = officer;
-            _fadeStage = 0;
+            _stateStartTime = Game.GameTime;
+            _animLoopTime = Game.GameTime;
 
-            // Protect player during arrest sequence
-            player.IsInvincible = true;
-
-            // Make police stop shooting and ignore aggression
-            Function.Call(Hash.SET_POLICE_IGNORE_PLAYER, Game.Player, true);
-
-            // Put hands up
+            // Player puts hands up
             player.Task.ClearAllImmediately();
             Function.Call(Hash.TASK_HANDS_UP, player.Handle, -1, 0, -1, true);
 
-            // Command all nearby cops to cease fire and aim
-            Ped[] nearbyPeds = World.GetNearbyPeds(player.Position, 60.0f);
-            foreach (var p in nearbyPeds)
+            // Temporarily protect player from wild stray bullets while complying
+            player.IsInvincible = true;
+
+            // Command all nearby cops to cease lethal fire
+            Function.Call(Hash.SET_POLICE_IGNORE_PLAYER, Game.Player, true);
+            Ped[] nearby = World.GetNearbyPeds(player.Position, 50.0f);
+            foreach (var p in nearby)
             {
-                if (PoliceUtils.IsCop(p))
+                if (PoliceUtils.IsCop(p) && p != _arrestingOfficer)
                 {
                     p.Task.ClearAllImmediately();
-                    Function.Call(Hash.TASK_AIM_GUN_AT_ENTITY, p.Handle, player.Handle, 8000, false);
+                    Function.Call(Hash.TASK_AIM_GUN_AT_ENTITY, p.Handle, player.Handle, 12000, false);
                 }
             }
 
-            if (_arrestingOfficer != null && _arrestingOfficer.Exists())
+            // Command arresting officer to holster weapon and walk directly to player
+            if (_arrestingOfficer.IsInVehicle())
             {
-                _arrestingOfficer.Task.GoTo(player.Position + player.ForwardVector * 1.0f);
+                _arrestingOfficer.Task.LeaveVehicle(_arrestingOfficer.CurrentVehicle, false);
             }
+            _arrestingOfficer.Task.ClearAllImmediately();
+            _arrestingOfficer.Weapons.Select(WeaponHash.Unarmed, true);
+            _arrestingOfficer.Task.GoTo(player.Position + player.ForwardVector * 0.8f);
 
-            UI.Notify("~b~Você se rendeu! ~w~Aguarde a polícia efetuar a prisão pacífica.");
+            UI.Notify("~b~Mãos ao alto! ~w~Não se mova enquanto o policial se aproxima para algemá-lo.");
         }
 
-        private void HandleSurrenderProcess(Ped player)
+        private void HandleHandsUpWaiting(Ped player)
         {
-            // Disable movement controls
-            Game.DisableControlThisFrame(0, GTA.Control.MoveLeftRight);
-            Game.DisableControlThisFrame(0, GTA.Control.MoveUpDown);
-            Game.DisableControlThisFrame(0, GTA.Control.Attack);
-            Game.DisableControlThisFrame(0, GTA.Control.Aim);
-            Game.DisableControlThisFrame(0, GTA.Control.Jump);
+            // Block player movement controls
+            DisablePlayerControls();
 
-            // Keep ignoring player so no rogue bullets
-            Function.Call(Hash.SET_POLICE_IGNORE_PLAYER, Game.Player, true);
-
-            int elapsed = Game.GameTime - _surrenderTime;
-
-            if (_fadeStage == 0 && elapsed > 2000)
+            // Re-apply hands up if dropped
+            if (Game.GameTime - _animLoopTime > 1500)
             {
-                _fadeStage = 1;
+                _animLoopTime = Game.GameTime;
+                Function.Call(Hash.TASK_HANDS_UP, player.Handle, -1, 0, -1, true);
+            }
+
+            if (_arrestingOfficer == null || !_arrestingOfficer.Exists() || _arrestingOfficer.IsDead)
+            {
+                // Find another cop if this one died
+                _arrestingOfficer = PoliceUtils.FindClosestPoliceOfficer(player.Position, 30.0f);
+                if (_arrestingOfficer == null)
+                {
+                    UI.Notify("~y~Nenhum policial alcançou você. Rendição cancelada.");
+                    Reset();
+                    player.IsInvincible = false;
+                    Function.Call(Hash.SET_POLICE_IGNORE_PLAYER, Game.Player, false);
+                    return;
+                }
+            }
+
+            // Keep officer moving to player
+            float dist = World.GetDistance(_arrestingOfficer.Position, player.Position);
+            if (dist > 1.8f)
+            {
+                _arrestingOfficer.Task.GoTo(player.Position + player.ForwardVector * 0.7f);
+                string waitText = "~b~Oficial se aproximando... ~w~(" + (int)dist + "m)";
+                new UIText(waitText, new System.Drawing.Point(UI.WIDTH / 2, UI.HEIGHT - 40), 0.42f, System.Drawing.Color.White, GTA.Font.ChaletComprimeCologne, true, false, true).Draw();
+            }
+            else
+            {
+                // Officer has physically arrived in front of the player!
+                State = SurrenderState.CopCuffingPlayer;
+                _stateStartTime = Game.GameTime;
+
+                // Rotate officer to face player directly
+                _arrestingOfficer.Task.TurnTo(player, 1000);
+
+                // Play handcuff arrest animation
+                Function.Call(Hash.TASK_ARREST_PED, _arrestingOfficer.Handle, player.Handle);
+
+                // Play metallic handcuff ratchet sound
+                PoliceUtils.PlayHandcuffSound();
+
+                UI.Notify("~y~Você foi algemado pelo oficial.");
+            }
+        }
+
+        private void HandleCuffing(Ped player)
+        {
+            DisablePlayerControls();
+
+            // After 2.5 seconds of physical cuffing animation, start screen fade
+            if (Game.GameTime - _stateStartTime > 2500)
+            {
+                State = SurrenderState.FadingToStation;
+                _stateStartTime = Game.GameTime;
                 Function.Call(Hash.DO_SCREEN_FADE_OUT, 1200);
             }
-            else if (_fadeStage == 1 && elapsed > 3500)
-            {
-                _fadeStage = 2;
+        }
 
+        private void HandleFading(Ped player)
+        {
+            DisablePlayerControls();
+
+            if (Game.GameTime - _stateStartTime > 1600)
+            {
+                // Deduct legal bail
                 int fee = Math.Min(Game.Player.Money, ConfigManager.BailAmount);
                 Game.Player.Money -= fee;
                 Game.Player.WantedLevel = 0;
 
-                // Teleport to nearest police station
+                // Move to police station
                 Vector3 stationPos = GetClosestPoliceStation(player.Position);
                 player.Position = stationPos;
                 player.Task.ClearAllImmediately();
@@ -124,8 +204,19 @@ namespace YnixPolice.Systems
                 Function.Call(Hash.DO_SCREEN_FADE_IN, 1200);
 
                 UI.Notify("~y~PRESO (BUSTED)\n~w~Você foi fichado e liberado sob fiança de ~r~$" + fee + "~w~ na delegacia.");
-                _isSurrendering = false;
+                Reset();
             }
+        }
+
+        private void DisablePlayerControls()
+        {
+            Game.DisableControlThisFrame(0, GTA.Control.MoveLeftRight);
+            Game.DisableControlThisFrame(0, GTA.Control.MoveUpDown);
+            Game.DisableControlThisFrame(0, GTA.Control.Attack);
+            Game.DisableControlThisFrame(0, GTA.Control.Aim);
+            Game.DisableControlThisFrame(0, GTA.Control.Jump);
+            Game.DisableControlThisFrame(0, GTA.Control.Sprint);
+            Game.DisableControlThisFrame(0, GTA.Control.Enter);
         }
 
         private static Vector3 GetClosestPoliceStation(Vector3 currentPos)
@@ -154,25 +245,10 @@ namespace YnixPolice.Systems
             return closest;
         }
 
-        private static Ped FindClosestPoliceOfficer(Vector3 pos, float radius)
+        public static void Reset()
         {
-            Ped[] peds = World.GetNearbyPeds(pos, radius);
-            Ped closest = null;
-            float minDist = float.MaxValue;
-
-            foreach (var p in peds)
-            {
-                if (PoliceUtils.IsCop(p))
-                {
-                    float d = World.GetDistance(pos, p.Position);
-                    if (d < minDist)
-                    {
-                        minDist = d;
-                        closest = p;
-                    }
-                }
-            }
-            return closest;
+            State = SurrenderState.Idle;
+            _arrestingOfficer = null;
         }
     }
 }
