@@ -21,6 +21,7 @@ namespace YnixPolice.Systems
         private static Ped _arrestingOfficer = null;
         private static int _stateStartTime = 0;
         private static int _animLoopTime = 0;
+        private static int _lastGoToTime = 0;
 
         public void OnTick()
         {
@@ -112,7 +113,8 @@ namespace YnixPolice.Systems
             }
             _arrestingOfficer.Task.ClearAllImmediately();
             _arrestingOfficer.Weapons.Select(WeaponHash.Unarmed, true);
-            _arrestingOfficer.Task.GoTo(player.Position + player.ForwardVector * 0.8f);
+            Function.Call(Hash.TASK_GO_TO_ENTITY, _arrestingOfficer.Handle, player.Handle, -1, 1.2f, 1.4f, 0, 0);
+            _lastGoToTime = Game.GameTime;
 
             UI.Notify("~b~Mãos ao alto! ~w~Não se mova enquanto o policial se aproxima para algemá-lo.");
         }
@@ -143,30 +145,34 @@ namespace YnixPolice.Systems
                 }
             }
 
-            // Keep officer moving to player
             float dist = World.GetDistance(_arrestingOfficer.Position, player.Position);
-            if (dist > 1.8f)
+
+            // Re-assert walking only every 3 seconds so the cop doesn't freeze in place!
+            if (Game.GameTime - _lastGoToTime > 3000)
             {
-                _arrestingOfficer.Task.GoTo(player.Position + player.ForwardVector * 0.7f);
-                string waitText = "~b~Oficial se aproximando... ~w~(" + (int)dist + "m)";
-                new UIText(waitText, new System.Drawing.Point(UI.WIDTH / 2, UI.HEIGHT - 40), 0.42f, System.Drawing.Color.White, GTA.Font.ChaletComprimeCologne, true, false, true).Draw();
+                _lastGoToTime = Game.GameTime;
+                Function.Call(Hash.TASK_GO_TO_ENTITY, _arrestingOfficer.Handle, player.Handle, -1, 1.2f, 1.4f, 0, 0);
             }
-            else
+
+            if (dist < 2.2f || (Game.GameTime - _stateStartTime > 12000))
             {
-                // Officer has physically arrived in front of the player!
+                // Officer has physically arrived!
                 State = SurrenderState.CopCuffingPlayer;
                 _stateStartTime = Game.GameTime;
 
-                // Rotate officer to face player directly
-                _arrestingOfficer.Task.TurnTo(player, 1000);
-
-                // Play handcuff arrest animation
+                _arrestingOfficer.Task.ClearAllImmediately();
+                Function.Call(Hash.TASK_TURN_PED_TO_FACE_ENTITY, _arrestingOfficer.Handle, player.Handle, 1000);
                 Function.Call(Hash.TASK_ARREST_PED, _arrestingOfficer.Handle, player.Handle);
 
-                // Play metallic handcuff ratchet sound
+                // Play metallic handcuff sound
                 PoliceUtils.PlayHandcuffSound();
 
                 UI.Notify("~y~Você foi algemado pelo oficial.");
+            }
+            else
+            {
+                string waitText = "~b~Oficial se aproximando... ~w~(" + (int)dist + "m)";
+                new UIText(waitText, new System.Drawing.Point(UI.WIDTH / 2, UI.HEIGHT - 40), 0.42f, System.Drawing.Color.White, GTA.Font.ChaletComprimeCologne, true, false, true).Draw();
             }
         }
 

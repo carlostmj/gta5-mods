@@ -25,6 +25,7 @@ namespace YnixPolice.Systems
         private Ped _copPed = null;
         private int _stopStartTime = 0;
         private int _lastCheckTime = 0;
+        private int _lastCopWalkTime = 0;
         private Blip _copBlip = null;
         private int _fledCheckCounter = 0;
 
@@ -261,16 +262,22 @@ namespace YnixPolice.Systems
             Vector3 driverWindow = playerVeh != null ? (playerVeh.Position + playerVeh.RightVector * -1.35f) : player.Position;
             float dist = World.GetDistance(_copPed.Position, driverWindow);
 
-            if (dist < 2.0f)
+            // Re-issue walking only every 3.5s so cop doesn't freeze
+            if (Game.GameTime - _lastCopWalkTime > 3500)
+            {
+                _lastCopWalkTime = Game.GameTime;
+                Function.Call(Hash.TASK_GO_TO_COORD_ANY_MEANS, _copPed.Handle, driverWindow.X, driverWindow.Y, driverWindow.Z, 1.2f, 0, 0, 786603, 0xbf800000);
+            }
+
+            if (dist < 2.3f || (Game.GameTime - _stopStartTime > 14000))
             {
                 CurrentState = VehicleStopState.DialogAtWindow;
                 _copPed.Task.ClearAllImmediately();
-                _copPed.Task.TurnTo(player, 800);
+                Function.Call(Hash.TASK_TURN_PED_TO_FACE_ENTITY, _copPed.Handle, player.Handle, 800);
                 Function.Call(Hash.TASK_START_SCENARIO_IN_PLACE, _copPed.Handle, "WORLD_HUMAN_COP_IDLES", 0, true);
             }
             else
             {
-                _copPed.Task.GoTo(driverWindow);
                 string waitNotice = "~b~Oficial se aproximando da janela do motorista...~w~";
                 new UIText(waitNotice, new System.Drawing.Point(UI.WIDTH / 2, UI.HEIGHT - 40), 0.45f, System.Drawing.Color.White, GTA.Font.ChaletComprimeCologne, true, false, true).Draw();
             }
