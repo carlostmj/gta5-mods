@@ -1,60 +1,57 @@
-# 🎮 GTA V Mods Repository
+# Ynix Trainer (GTA V) - v1.5.0.0
 
-Collection of custom, high-performance, and modular mods developed for **Grand Theft Auto V (PC Singleplayer)**.
+Trainer completo, moderno, estável e traduzido para Grand Theft Auto V (Modo História / Singleplayer).
 
-Organized according to the [5Mods Upload Guidelines](https://github.com/5mods/tutorials/blob/master/5Mods%20Upload%20Guidelines.md).
-
----
-
-## 📂 Repository Structure
-
-The mods in this repository are structured in modular directories under `mods/<ModName>`:
-
-```text
-mods/
-└── YnixTrainer/
-    ├── README.md        # Complete 5Mods-compliant description & documentation
-    ├── package/         # Ready-to-use drop-in mod files (drag & drop into GTA V)
-    │   └── scripts/
-    │       ├── YnixTrainer.dll
-    │       └── YnixTrainer/
-    │           ├── Config.ini
-    │           ├── addons.json
-    │           └── Languages/
-    │               ├── pt-BR.ini
-    │               └── en-US.ini
-    └── src/             # Full C# source code and compiler scripts
-        ├── Core/
-        ├── Modules/
-        └── build.bat
-```
+Desenvolvido em C# com ScriptHookVDotNet e NativeUI.
 
 ---
 
-## 🚀 Available Mods
-
-| Mod | Category | Current Version | Description |
-| :--- | :--- | :--- | :--- |
-| **[Ynix Trainer](mods/YnixTrainer/)** | Script / Trainer | `v1.3.0.0` | Comprehensive modular trainer featuring anti-despawn vehicle spawning, real-time manual LSC customization, skin changer, tactical bodyguards, superpowers (NoClip, Night/Thermal vision), animations, digital speedometer HUD, and multi-language support. |
+## 🚀 Novidades da v1.5.0.0
+- **Piloto Automático Inteligente Reconstruído**:
+  - Navegação de longa distância real via `TASK_VEHICLE_DRIVE_TO_COORD_LONGRANGE`.
+  - Cálculo de altitude de solo (`Z`) para nunca bugar em viadutos ou morros.
+  - Fechamento automático de menus ao iniciar para evitar conflito de botões.
+  - HUD na tela com distância restante, velocidade da IA e aviso de cancelamento.
+  - Cancelamento suave segurando o freio (`S`), buzina (`E`) ou freio de mão (`Espaço`).
+  - 3 Estilos de condução: Seguro/Legal, Rápido/Desvio de Tráfego e Fuga/Agressivo.
+- **Super Nitro Boost (NOS)**:
+  - Impulso veloz ao segurar `Shift` ou `X` com limite de velocidade liberado.
+- **Pulo de Veículo (Car Jump)**:
+  - Pressione `Espaço` no carro para saltar por cima de obstáculos estilo Ruiner 2000.
+- **Auto-Desvirar (Anti-Capotamento)**:
+  - Corrige automaticamente o veículo caso ele fique de cabeça para baixo.
+- **Rampa Acrobática Instantânea**:
+  - Cria rampas de salto 15 metros à frente com 1 clique para decolar em acrobacias.
+- **Câmera Lenta / Bullet Time (Modo Matrix)**:
+  - 3 intensidades de câmera lenta no mundo (0.7x, 0.4x, 0.15x Matrix) para cenas de ação épicas.
+- **Rádio Portátil a Pé (Mobile Radio)**:
+  - Escute as estações de rádio do GTA V enquanto anda, corre ou nada.
+- **Gerador de Dinheiro Ampliado**:
+  - +$100.000, +$1.000.000, +$10.000.000, +$100.000.000 e Dinheiro Máximo ($2.147.483.647).
+- **Consistência de God Mode**:
+  - Desativar No-Clip não remove mais o God Mode se o jogador já o tinha ligado.
 
 ---
 
-## ⚠️ Important Singleplayer Notice
-
-All mods in this repository are strictly developed and intended for **GTA V PC Singleplayer (Story Mode)**.
-Modding GTA Online is against Rockstar Games' Terms of Service. Do not attempt to use these scripts in online modes.
-
----
-
-## 📜 Credits & Acknowledgments
-
-* **Mod Author**: Carlos
-* **Script Hook V**: Alexander Blade
-* **Community Script Hook V .NET**: crosire & contributors
-* **NativeUI**: Guadmaz
+## 📦 Instalação
+1. Certifique-se de ter instalado no diretório do GTA V:
+   - **ScriptHookV** (`ScriptHookV.dll`)
+   - **ScriptHookVDotNet** (`ScriptHookVDotNet.asi`, `ScriptHookVDotNet2.dll`)
+   - **NativeUI** (`scripts/NativeUI.dll`)
+2. Copie o conteúdo da pasta `scripts` do arquivo zip para a pasta `Grand Theft Auto V/scripts/`.
+3. Pressione **F4** dentro do jogo para abrir o menu!
 
 ---
 
-## 📄 License
+## 🎮 Teclas de Atalho
+- **F4**: Abrir / Fechar o menu Ynix Trainer
+- **Setas / Enter / Backspace**: Navegação do menu
+- **Shift** ou **X** (no veículo): Nitro Boost / NOS
+- **Espaço** (no veículo): Pulo Acrobático
+- **S** (segurar 0.25s) ou **E**: Cancelar Piloto Automático
 
-This repository is distributed under the [MIT License](LICENSE).
+---
+
+## 📜 Créditos
+- **Desenvolvido por**: Carlos (carlostmj)
+- **Ferramentas**: Alexander Blade (ScriptHookV), crosire (ScriptHookVDotNet), Guadmaz (NativeUI)
