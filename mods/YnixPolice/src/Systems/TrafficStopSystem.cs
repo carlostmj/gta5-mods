@@ -10,10 +10,8 @@ namespace YnixPolice.Systems
     public enum TrafficStopState
     {
         Idle,
-        PursuingToStop,
-        CopApproaching,
-        AtDriverWindow,
-        ResolvingFine
+        PulledOverWaitingCop,
+        CopAtWindow
     }
 
     public class TrafficStopSystem
@@ -23,8 +21,7 @@ namespace YnixPolice.Systems
         private Vehicle _copVehicle = null;
         private Ped _copPed = null;
         private int _stopStartTime = 0;
-        private int _lastSpeedCheckTime = 0;
-        private Blip _copBlip = null;
+        private int _lastSpeedCheck = 0;
 
         public void OnTick()
         {
@@ -37,226 +34,202 @@ namespace YnixPolice.Systems
                 return;
             }
 
-            switch (CurrentState)
+            // 1. Speeding trigger: If player speeds > threshold in city and no stars, give 1 star for traffic violation!
+            if (player.IsInVehicle() && Game.Player.WantedLevel == 0)
             {
-                case TrafficStopState.Idle:
-                    CheckForTrafficInfractions(player);
-                    break;
+                int now = Game.GameTime;
+                if (now - _lastSpeedCheck > 1000)
+                {
+                    _lastSpeedCheck = now;
+                    Vehicle playerVeh = player.CurrentVehicle;
+                    if (playerVeh != null && playerVeh.Exists())
+                    {
+                        float kmh = playerVeh.Speed * 3.6f;
+                        if (kmh >= ConfigManager.SpeedingThresholdKMH)
+                        {
+                            // Check if near any cop car or cop ped within 50m
+                            Vehicle[] nearby = World.GetNearbyVehicles(player.Position, 50.0f);
+                            foreach (var v in nearby)
+                            {
+                                if (v != null && v.Exists() && v.ClassType == VehicleClass.Emergency)
+                                {
+                                    Game.Player.WantedLevel = 1;
+                                    UI.Notify("~b~INFRAÇÃO DE TRÂNSITO!~w~\nExcesso de velocidade a " + (int)kmh + " KM/H.");
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
-                case TrafficStopState.PursuingToStop:
-                    HandlePursuingToStop(player);
-                    break;
-
-                case TrafficStopState.CopApproaching:
-                    HandleCopApproaching(player);
-                    break;
-
-                case TrafficStopState.AtDriverWindow:
-                    HandleAtDriverWindow(player);
-                    break;
+            // 2. Active Traffic Stop logic when WantedLevel == 1
+            if (Game.Player.WantedLevel == 1)
+            {
+                HandleOneStarTrafficStop(player);
+            }
+            else
+            {
+                if (CurrentState != TrafficStopState.Idle)
+                {
+                    Reset();
+                }
             }
         }
 
-        private void CheckForTrafficInfractions(Ped player)
+        private void HandleOneStarTrafficStop(Ped player)
         {
-            if (!player.IsInVehicle()) return;
-            Vehicle playerVeh = player.CurrentVehicle;
-            if (playerVeh == null || !playerVeh.Exists()) return;
-            if (Game.Player.WantedLevel > 0) return;
+            // At 1 star: Police MUST NEVER SHOOT the player!
+            Function.Call(Hash.SET_POLICE_IGNORE_PLAYER, Game.Player, false);
 
-            // Only check every 500ms for high performance
-            int now = Game.GameTime;
-            if (now - _lastSpeedCheckTime < 500) return;
-            _lastSpeedCheckTime = now;
-
-            float kmh = playerVeh.Speed * 3.6f;
-            bool isSpeeding = kmh >= ConfigManager.SpeedingThresholdKMH;
-
-            // Look for nearby police vehicles within 40m
-            Vehicle[] nearbyVehs = World.GetNearbyVehicles(player.Position, 40.0f);
-            foreach (var veh in nearbyVehs)
+            Ped[] nearby = World.GetNearbyPeds(player.Position, 50.0f);
+            foreach (var p in nearby)
             {
-                if (veh != null && veh.Exists() && veh.ClassType == VehicleClass.Emergency)
+                if (PoliceUtils.IsCop(p))
                 {
-                    Ped driver = veh.GetPedOnSeat(VehicleSeat.Driver);
-                    if (driver != null && driver.Exists() && (driver.RelationshipGroup == 0x432D1DE1 || Function.Call<int>(Hash.GET_PED_TYPE, driver.Handle) == 6))
+                    // Block shooting
+                    Function.Call(Hash.SET_PED_CAN_ARM_IK, p.Handle, false);
+                    if (p.Weapons.Current != null && p.Weapons.Current.Group != WeaponGroup.Unarmed && p.Weapons.Current.Group != WeaponGroup.Melee)
                     {
-                        // Found a patrol car
-                        if (isSpeeding)
+                        if (!p.Weapons.HasWeapon(WeaponHash.StunGun))
                         {
-                            InitiateTrafficStop(player, veh, driver, "Excesso de Velocidade (" + (int)kmh + " KM/H)");
-                            return;
+                            p.Weapons.Give(WeaponHash.StunGun, 100, true, true);
+                        }
+                        p.Weapons.Select(WeaponHash.StunGun, true);
+                    }
+                }
+            }
+
+            if (player.IsInVehicle())
+            {
+                Vehicle playerVeh = player.CurrentVehicle;
+
+                // If player is moving fast, show prompt to pull over
+                if (playerVeh.Speed > 2.0f)
+                {
+                    CurrentState = TrafficStopState.Idle;
+                    string hint = "~y~ORDEM DE PARADA POLICIAL ~w~| Encoste o carro no acostamento (Segure [S] ou [Espaço])";
+                    new UIText(hint, new System.Drawing.Point(UI.WIDTH / 2, UI.HEIGHT - 40), 0.45f, System.Drawing.Color.White, GTA.Font.ChaletComprimeCologne, true, false, true).Draw();
+                }
+                else
+                {
+                    // Player has stopped the car!
+                    if (CurrentState == TrafficStopState.Idle)
+                    {
+                        CurrentState = TrafficStopState.PulledOverWaitingCop;
+                        _stopStartTime = Game.GameTime;
+
+                        // Find closest cop vehicle
+                        Vehicle[] emergencyVehs = World.GetNearbyVehicles(player.Position, 45.0f);
+                        foreach (var v in emergencyVehs)
+                        {
+                            if (v != null && v.Exists() && v.ClassType == VehicleClass.Emergency)
+                            {
+                                _copVehicle = v;
+                                _copPed = v.GetPedOnSeat(VehicleSeat.Driver);
+                                break;
+                            }
+                        }
+
+                        if (_copPed != null && _copPed.Exists())
+                        {
+                            _copPed.Task.LeaveVehicle(_copVehicle, false);
+                            Vector3 targetPos = playerVeh.Position + playerVeh.RightVector * -1.3f;
+                            _copPed.Task.GoTo(targetPos);
+                            UI.Notify("~b~O policial está se aproximando da janela do motorista...\nAguarde no veículo.");
+                        }
+                    }
+                    else if (CurrentState == TrafficStopState.PulledOverWaitingCop)
+                    {
+                        if (_copPed != null && _copPed.Exists())
+                        {
+                            float d = World.GetDistance(_copPed.Position, player.Position);
+                            if (d < 3.0f)
+                            {
+                                CurrentState = TrafficStopState.CopAtWindow;
+                                Function.Call(Hash.TASK_START_SCENARIO_IN_PLACE, _copPed.Handle, "WORLD_HUMAN_COP_IDLES", 0, true);
+                            }
+                            else
+                            {
+                                string wMsg = "~b~Aguarde: ~w~O policial está caminhando até o seu veículo...";
+                                new UIText(wMsg, new System.Drawing.Point(UI.WIDTH / 2, UI.HEIGHT - 40), 0.45f, System.Drawing.Color.White, GTA.Font.ChaletComprimeCologne, true, false, true).Draw();
+                            }
+                        }
+                        else
+                        {
+                            // No cop ped nearby, find any cop on foot
+                            _copPed = FindClosestCopOnFoot(player.Position, 40.0f);
+                            if (_copPed == null)
+                            {
+                                // Show direct fine resolution prompt
+                                CurrentState = TrafficStopState.CopAtWindow;
+                            }
+                        }
+                    }
+                    else if (CurrentState == TrafficStopState.CopAtWindow)
+                    {
+                        // Show interaction dialog
+                        string dialog = "~b~Polícia de Los Santos: ~w~Infração de Trânsito registrada.\nPressione ~g~[" + ConfigManager.AcceptFineKey.ToString() + "]~w~ Pagar Multa ($" + ConfigManager.TicketFineAmount + ") | ~r~[" + ConfigManager.SurrenderKey.ToString() + "]~w~ Render-se";
+                        new UIText(dialog, new System.Drawing.Point(UI.WIDTH / 2, UI.HEIGHT - 45), 0.45f, System.Drawing.Color.White, GTA.Font.ChaletComprimeCologne, true, false, true).Draw();
+
+                        // Option 1: Pay Fine
+                        if (Game.IsKeyPressed(ConfigManager.AcceptFineKey))
+                        {
+                            if (Game.Player.Money >= ConfigManager.TicketFineAmount)
+                            {
+                                Game.Player.Money -= ConfigManager.TicketFineAmount;
+                                Game.Player.WantedLevel = 0;
+                                UI.Notify("~g~Multa de trânsito de $" + ConfigManager.TicketFineAmount + " paga com sucesso!\nVocê foi liberado com advertência.");
+                                if (_copPed != null && _copPed.Exists())
+                                {
+                                    _copPed.Task.ClearAll();
+                                    if (_copVehicle != null && _copVehicle.Exists())
+                                    {
+                                        _copPed.Task.EnterVehicle(_copVehicle, VehicleSeat.Driver);
+                                    }
+                                }
+                                Reset();
+                            }
+                            else
+                            {
+                                UI.Notify("~r~Você não tem dinheiro suficiente para pagar a multa!");
+                            }
+                        }
+                        // Option 2: Surrender
+                        else if (Game.IsKeyPressed(ConfigManager.SurrenderKey))
+                        {
+                            player.Task.LeaveVehicle(playerVeh, false);
+                            SurrenderSystem.TriggerSurrender(player, _copPed);
+                            Reset();
                         }
                     }
                 }
             }
         }
 
-        private void InitiateTrafficStop(Ped player, Vehicle copVeh, Ped copPed, string reason)
+        private Ped FindClosestCopOnFoot(Vector3 pos, float radius)
         {
-            _copVehicle = copVeh;
-            _copPed = copPed;
-            _stopStartTime = Game.GameTime;
-            CurrentState = TrafficStopState.PursuingToStop;
-
-            // Siren on
-            Function.Call(Hash.SET_VEHICLE_SIREN, _copVehicle.Handle, true);
-
-            if (_copBlip != null && _copBlip.Exists()) _copBlip.Remove();
-            _copBlip = _copVehicle.AddBlip();
-            _copBlip.Color = BlipColor.Blue;
-            _copBlip.IsFlashing = true;
-
-            UI.Notify("~b~POLÍCIA DE LOS SANTOS:~w~\n" + reason + "!\nEncoste o veículo no acostamento e desligue o motor.");
-        }
-
-        private void HandlePursuingToStop(Ped player)
-        {
-            if (_copVehicle == null || !_copVehicle.Exists() || _copPed == null || !_copPed.Exists())
+            Ped[] peds = World.GetNearbyPeds(pos, radius);
+            Ped closest = null;
+            float minD = float.MaxValue;
+            foreach (var p in peds)
             {
-                Reset();
-                return;
-            }
-
-            // Check if player fled (drove away at speed)
-            if (player.IsInVehicle() && player.CurrentVehicle.Speed > 18.0f && World.GetDistance(player.Position, _copVehicle.Position) > 60.0f)
-            {
-                UI.Notify("~r~Você desobedeceu a ordem de parada! Fuga em andamento!");
-                Game.Player.WantedLevel = 2;
-                Reset();
-                return;
-            }
-
-            // Check timeout (player ignored for 30s)
-            if (Game.GameTime - _stopStartTime > 30000)
-            {
-                Game.Player.WantedLevel = 2;
-                Reset();
-                return;
-            }
-
-            // Check if player vehicle has stopped
-            if (player.IsInVehicle())
-            {
-                Vehicle playerVeh = player.CurrentVehicle;
-                if (playerVeh.Speed < 1.0f)
+                if (PoliceUtils.IsCop(p) && !p.IsInVehicle())
                 {
-                    CurrentState = TrafficStopState.CopApproaching;
-
-                    _copPed.Task.ParkVehicle(_copVehicle, playerVeh.Position - playerVeh.ForwardVector * 7.0f, playerVeh.Heading);
-                    _copPed.Task.LeaveVehicle(_copVehicle, false);
-
-                    Vector3 driverWindowPos = playerVeh.Position + playerVeh.RightVector * -1.3f;
-                    _copPed.Task.GoTo(driverWindowPos);
-
-                    UI.Notify("~b~O policial está se aproximando da janela do motorista...\nAguarde no veículo.");
-                }
-                else
-                {
-                    string prompt = "~y~ORDEM DE PARADA POLICIAL ~w~| Estacione o veículo no acostamento (Segure [S] ou [Espaço])";
-                    new UIText(prompt, new System.Drawing.Point(UI.WIDTH / 2, UI.HEIGHT - 40), 0.45f, System.Drawing.Color.White, GTA.Font.ChaletComprimeCologne, true, false, true).Draw();
+                    float d = World.GetDistance(pos, p.Position);
+                    if (d < minD)
+                    {
+                        minD = d;
+                        closest = p;
+                    }
                 }
             }
-            else
-            {
-                CurrentState = TrafficStopState.CopApproaching;
-                _copPed.Task.LeaveVehicle(_copVehicle, false);
-                _copPed.Task.GoTo(player.Position + player.ForwardVector * 1.5f);
-            }
-        }
-
-        private void HandleCopApproaching(Ped player)
-        {
-            if (_copPed == null || !_copPed.Exists())
-            {
-                Reset();
-                return;
-            }
-
-            float dist = World.GetDistance(_copPed.Position, player.Position);
-            if (dist < 2.5f)
-            {
-                CurrentState = TrafficStopState.AtDriverWindow;
-                Function.Call(Hash.TASK_START_SCENARIO_IN_PLACE, _copPed.Handle, "WORLD_HUMAN_COP_IDLES", 0, true);
-            }
-            else
-            {
-                if (player.IsInVehicle() && player.CurrentVehicle.Speed > 8.0f)
-                {
-                    UI.Notify("~r~Fuga em flagrante! Perseguição iniciada!");
-                    Game.Player.WantedLevel = 2;
-                    Reset();
-                }
-            }
-        }
-
-        private void HandleAtDriverWindow(Ped player)
-        {
-            if (_copPed == null || !_copPed.Exists())
-            {
-                Reset();
-                return;
-            }
-
-            string dialog = "~b~Oficial de Trânsito:~w~ \"Infração registrada.\"\nPressione ~g~[" + ConfigManager.AcceptFineKey.ToString() + "]~w~ Pagar Multa ($" + ConfigManager.TicketFineAmount + ") | ~r~[" + ConfigManager.SurrenderKey.ToString() + "]~w~ Descer e Render-se";
-            new UIText(dialog, new System.Drawing.Point(UI.WIDTH / 2, UI.HEIGHT - 45), 0.45f, System.Drawing.Color.White, GTA.Font.ChaletComprimeCologne, true, false, true).Draw();
-
-            if (Game.IsKeyPressed(ConfigManager.AcceptFineKey))
-            {
-                if (Game.Player.Money >= ConfigManager.TicketFineAmount)
-                {
-                    Game.Player.Money -= ConfigManager.TicketFineAmount;
-                    UI.Notify("~g~Multa de trânsito de $" + ConfigManager.TicketFineAmount + " paga com sucesso.\nVocê foi liberado com uma advertência!");
-                }
-                else
-                {
-                    UI.Notify("~r~Você não tem dinheiro suficiente para a multa!");
-                    Game.Player.WantedLevel = 1;
-                }
-                DismissCop();
-                Reset();
-            }
-            else if (Game.IsKeyPressed(ConfigManager.SurrenderKey))
-            {
-                if (player.IsInVehicle())
-                {
-                    player.Task.LeaveVehicle(player.CurrentVehicle, false);
-                }
-                SurrenderSystem.TriggerSurrender(player, _copPed);
-                Reset();
-            }
-            else if (player.IsInVehicle() && player.CurrentVehicle.Speed > 10.0f)
-            {
-                UI.Notify("~r~Fuga de abordagem policial!");
-                Game.Player.WantedLevel = 2;
-                Reset();
-            }
-        }
-
-        private void DismissCop()
-        {
-            if (_copPed != null && _copPed.Exists())
-            {
-                _copPed.Task.ClearAll();
-                if (_copVehicle != null && _copVehicle.Exists())
-                {
-                    _copPed.Task.EnterVehicle(_copVehicle, VehicleSeat.Driver);
-                }
-            }
-            if (_copVehicle != null && _copVehicle.Exists())
-            {
-                Function.Call(Hash.SET_VEHICLE_SIREN, _copVehicle.Handle, false);
-            }
+            return closest;
         }
 
         public void Reset()
         {
             CurrentState = TrafficStopState.Idle;
-            if (_copBlip != null && _copBlip.Exists())
-            {
-                _copBlip.Remove();
-                _copBlip = null;
-            }
             _copVehicle = null;
             _copPed = null;
         }

@@ -31,31 +31,22 @@ namespace YnixPolice.Systems
                 return;
             }
 
-            // Can surrender if wanted (1, 2 or 3 stars) and on foot
-            if (Game.Player.WantedLevel > 0 && Game.Player.WantedLevel <= 3 && !player.IsInVehicle())
+            // Available during 1, 2 or 3 stars (even on foot or inside vehicle)
+            if (Game.Player.WantedLevel > 0 && Game.Player.WantedLevel <= 3)
             {
-                // Check surrender key hold or press
+                // Show hint on screen
+                string hint = string.Format("Segure [{0}] para Erguer as Mãos e Render-se", ConfigManager.SurrenderKey.ToString());
+                new UIText(hint, new System.Drawing.Point(UI.WIDTH / 2, UI.HEIGHT - 65), 0.4f, System.Drawing.Color.FromArgb(220, 255, 255, 255), GTA.Font.ChaletComprimeCologne, true, false, true).Draw();
+
                 if (Game.IsKeyPressed(ConfigManager.SurrenderKey))
                 {
-                    Ped officer = FindClosestPoliceOfficer(player.Position, 40.0f);
-                    if (officer != null)
+                    if (player.IsInVehicle())
                     {
-                        TriggerSurrender(player, officer);
+                        player.Task.LeaveVehicle(player.CurrentVehicle, false);
                     }
-                    else
-                    {
-                        // Surrender on the spot even if cops are arriving
-                        TriggerSurrender(player, null);
-                    }
-                }
-                else
-                {
-                    // Optional on-screen hint when pursued
-                    if (Game.Player.WantedLevel <= 2)
-                    {
-                        string hint = string.Format("Segure [{0}] para Erguer as Mãos e Render-se", ConfigManager.SurrenderKey.ToString());
-                        new UIText(hint, new System.Drawing.Point(UI.WIDTH / 2, UI.HEIGHT - 65), 0.4f, System.Drawing.Color.FromArgb(200, 255, 255, 255), GTA.Font.ChaletComprimeCologne, true, false, true).Draw();
-                    }
+
+                    Ped officer = FindClosestPoliceOfficer(player.Position, 50.0f);
+                    TriggerSurrender(player, officer);
                 }
             }
         }
@@ -67,18 +58,24 @@ namespace YnixPolice.Systems
             _arrestingOfficer = officer;
             _fadeStage = 0;
 
-            // Raise hands
+            // Protect player during arrest sequence
+            player.IsInvincible = true;
+
+            // Make police stop shooting and ignore aggression
+            Function.Call(Hash.SET_POLICE_IGNORE_PLAYER, Game.Player, true);
+
+            // Put hands up
             player.Task.ClearAllImmediately();
             Function.Call(Hash.TASK_HANDS_UP, player.Handle, -1, 0, -1, true);
 
-            // Cease fire on all nearby cops
-            Ped[] nearbyPeds = World.GetNearbyPeds(player.Position, 50.0f);
+            // Command all nearby cops to cease fire and aim
+            Ped[] nearbyPeds = World.GetNearbyPeds(player.Position, 60.0f);
             foreach (var p in nearbyPeds)
             {
-                if (p != null && p.Exists() && IsPolicePed(p))
+                if (PoliceUtils.IsCop(p))
                 {
-                    p.Task.ClearAll();
-                    p.Task.AimAt(player, 6000);
+                    p.Task.ClearAllImmediately();
+                    Function.Call(Hash.TASK_AIM_GUN_AT_ENTITY, p.Handle, player.Handle, 8000, false);
                 }
             }
 
@@ -87,30 +84,32 @@ namespace YnixPolice.Systems
                 _arrestingOfficer.Task.GoTo(player.Position + player.ForwardVector * 1.0f);
             }
 
-            UI.Notify("~b~Você se rendeu! ~w~Aguarde a polícia se aproximar.");
+            UI.Notify("~b~Você se rendeu! ~w~Aguarde a polícia efetuar a prisão pacífica.");
         }
 
         private void HandleSurrenderProcess(Ped player)
         {
-            // Disable player movement while surrendering
+            // Disable movement controls
             Game.DisableControlThisFrame(0, GTA.Control.MoveLeftRight);
             Game.DisableControlThisFrame(0, GTA.Control.MoveUpDown);
             Game.DisableControlThisFrame(0, GTA.Control.Attack);
             Game.DisableControlThisFrame(0, GTA.Control.Aim);
             Game.DisableControlThisFrame(0, GTA.Control.Jump);
 
+            // Keep ignoring player so no rogue bullets
+            Function.Call(Hash.SET_POLICE_IGNORE_PLAYER, Game.Player, true);
+
             int elapsed = Game.GameTime - _surrenderTime;
 
-            if (_fadeStage == 0 && elapsed > 2500)
+            if (_fadeStage == 0 && elapsed > 2000)
             {
                 _fadeStage = 1;
                 Function.Call(Hash.DO_SCREEN_FADE_OUT, 1200);
             }
-            else if (_fadeStage == 1 && elapsed > 4000)
+            else if (_fadeStage == 1 && elapsed > 3500)
             {
                 _fadeStage = 2;
 
-                // Deduct legal bail
                 int fee = Math.Min(Game.Player.Money, ConfigManager.BailAmount);
                 Game.Player.Money -= fee;
                 Game.Player.WantedLevel = 0;
@@ -119,8 +118,11 @@ namespace YnixPolice.Systems
                 Vector3 stationPos = GetClosestPoliceStation(player.Position);
                 player.Position = stationPos;
                 player.Task.ClearAllImmediately();
+                player.IsInvincible = false;
 
+                Function.Call(Hash.SET_POLICE_IGNORE_PLAYER, Game.Player, false);
                 Function.Call(Hash.DO_SCREEN_FADE_IN, 1200);
+
                 UI.Notify("~y~PRESO (BUSTED)\n~w~Você foi fichado e liberado sob fiança de ~r~$" + fee + "~w~ na delegacia.");
                 _isSurrendering = false;
             }
@@ -160,7 +162,7 @@ namespace YnixPolice.Systems
 
             foreach (var p in peds)
             {
-                if (p != null && p.Exists() && !p.IsDead && IsPolicePed(p))
+                if (PoliceUtils.IsCop(p))
                 {
                     float d = World.GetDistance(pos, p.Position);
                     if (d < minDist)
@@ -171,11 +173,6 @@ namespace YnixPolice.Systems
                 }
             }
             return closest;
-        }
-
-        private static bool IsPolicePed(Ped p)
-        {
-            return p.RelationshipGroup == 0x432D1DE1 || Function.Call<int>(Hash.GET_PED_TYPE, p.Handle) == 6;
         }
     }
 }
