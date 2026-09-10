@@ -34,6 +34,14 @@ namespace YnixPolice.Systems
                 return;
             }
 
+            // If GTA V's native arrest system is currently arresting the player (e.g. at 1 star on foot),
+            // yield completely so we don't duplicate UI or conflict with the native Busted screen!
+            if (IsNativeArrestInProgress(player))
+            {
+                Reset();
+                return;
+            }
+
             switch (State)
             {
                 case SurrenderState.Idle:
@@ -54,16 +62,36 @@ namespace YnixPolice.Systems
             }
         }
 
+        private bool IsNativeArrestInProgress(Ped player)
+        {
+            try
+            {
+                // Native check: IS_PLAYER_BEING_ARRESTED (hash 0x56E051390310243C)
+                if (Function.Call<bool>(Hash.IS_PLAYER_BEING_ARRESTED, Game.Player.Handle, true))
+                    return true;
+
+                // Native ped check: IS_PED_BEING_ARRESTED
+                if (Function.Call<bool>(Hash.IS_PED_BEING_ARRESTED, player.Handle))
+                    return true;
+            }
+            catch { }
+
+            return false;
+        }
+
         private void HandleIdleState(Ped player)
         {
-            // Only show surrender prompt if player has wanted level AND an alive cop is within 30m!
-            if (Game.Player.WantedLevel > 0 && Game.Player.WantedLevel <= 3 && !player.IsInVehicle())
+            // GTA V natively handles 1-star on-foot arrest when standing still.
+            // Our mod provides surrender when:
+            // 1) Player has 2 or 3 stars (where GTA V police normally shoot to kill without mercy!)
+            // 2) Or player explicitly presses surrender key while fleeing
+            if (Game.Player.WantedLevel >= 2 && Game.Player.WantedLevel <= 3 && !player.IsInVehicle())
             {
-                Ped nearbyCop = PoliceUtils.FindClosestPoliceOfficer(player.Position, 30.0f);
+                Ped nearbyCop = PoliceUtils.FindClosestPoliceOfficer(player.Position, 35.0f);
                 if (nearbyCop != null)
                 {
-                    // Show prompt on screen
-                    string hint = string.Format("~y~POLÍCIA PRÓXIMA ~w~| Pressione ~g~[{0}]~w~ para Mãos ao Alto e Render-se", ConfigManager.SurrenderKey.ToString());
+                    // Clean prompt on screen (only for 2-3 stars where vanilla GTA never arrests!)
+                    string hint = string.Format("~y~POLÍCIA EM ALERTA ~w~| Pressione ~g~[{0}]~w~ para Mãos na Cabeça e Render-se", ConfigManager.SurrenderKey.ToString());
                     new UIText(hint, new System.Drawing.Point(UI.WIDTH / 2, UI.HEIGHT - 65), 0.42f, System.Drawing.Color.White, GTA.Font.ChaletComprimeCologne, true, false, true).Draw();
 
                     if (Game.IsKeyPressed(ConfigManager.SurrenderKey))
@@ -87,7 +115,7 @@ namespace YnixPolice.Systems
             _stateStartTime = Game.GameTime;
             _animLoopTime = Game.GameTime;
 
-            // Player puts hands up
+            // Player puts hands behind head / surrenders
             player.Task.ClearAllImmediately();
             Function.Call(Hash.TASK_HANDS_UP, player.Handle, -1, 0, -1, true);
 
@@ -107,13 +135,14 @@ namespace YnixPolice.Systems
             }
 
             // Command arresting officer to holster weapon and walk directly to player
+            _arrestingOfficer.BlockPermanentEvents = true;
             if (_arrestingOfficer.IsInVehicle())
             {
                 _arrestingOfficer.Task.LeaveVehicle(_arrestingOfficer.CurrentVehicle, false);
             }
             _arrestingOfficer.Task.ClearAllImmediately();
             _arrestingOfficer.Weapons.Select(WeaponHash.Unarmed, true);
-            Function.Call(Hash.TASK_GO_TO_ENTITY, _arrestingOfficer.Handle, player.Handle, -1, 1.2f, 1.4f, 0, 0);
+            Function.Call(Hash.TASK_GO_TO_ENTITY, _arrestingOfficer.Handle, player.Handle, -1, 1.2f, 1.3f, 0, 0);
             _lastGoToTime = Game.GameTime;
 
             UI.Notify("~b~Mãos ao alto! ~w~Não se mova enquanto o policial se aproxima para algemá-lo.");
@@ -147,14 +176,14 @@ namespace YnixPolice.Systems
 
             float dist = World.GetDistance(_arrestingOfficer.Position, player.Position);
 
-            // Re-assert walking only every 3 seconds so the cop doesn't freeze in place!
-            if (Game.GameTime - _lastGoToTime > 3000)
+            // Re-assert walking only every 3.5 seconds so the cop doesn't stutter/freeze
+            if (Game.GameTime - _lastGoToTime > 3500)
             {
                 _lastGoToTime = Game.GameTime;
-                Function.Call(Hash.TASK_GO_TO_ENTITY, _arrestingOfficer.Handle, player.Handle, -1, 1.2f, 1.4f, 0, 0);
+                Function.Call(Hash.TASK_GO_TO_ENTITY, _arrestingOfficer.Handle, player.Handle, -1, 1.2f, 1.3f, 0, 0);
             }
 
-            if (dist < 2.2f || (Game.GameTime - _stateStartTime > 12000))
+            if (dist < 2.0f || (Game.GameTime - _stateStartTime > 12000))
             {
                 // Officer has physically arrived!
                 State = SurrenderState.CopCuffingPlayer;
@@ -206,6 +235,11 @@ namespace YnixPolice.Systems
                 player.Task.ClearAllImmediately();
                 player.IsInvincible = false;
 
+                if (_arrestingOfficer != null && _arrestingOfficer.Exists())
+                {
+                    _arrestingOfficer.BlockPermanentEvents = false;
+                }
+
                 Function.Call(Hash.SET_POLICE_IGNORE_PLAYER, Game.Player, false);
                 Function.Call(Hash.DO_SCREEN_FADE_IN, 1200);
 
@@ -254,6 +288,10 @@ namespace YnixPolice.Systems
         public static void Reset()
         {
             State = SurrenderState.Idle;
+            if (_arrestingOfficer != null && _arrestingOfficer.Exists())
+            {
+                _arrestingOfficer.BlockPermanentEvents = false;
+            }
             _arrestingOfficer = null;
         }
     }
