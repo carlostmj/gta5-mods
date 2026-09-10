@@ -30,9 +30,12 @@ namespace YnixTrainer.Modules
         private bool _autopilotActive = false;
         private int _autopilotStartTime = 0;
         private int _autopilotStyle = 786603; // Safe / Legal by default
+        private float _autopilotAggressiveness = 0.0f;
         private float _autopilotSpeed = 28.0f; // ~100 km/h
         private Vector3 _autopilotDestination = Vector3.Zero;
         private int _brakeHoldCounter = 0;
+        private int _stuckCounter = 0;
+        private bool _trafficRammer = false;
         private readonly List<Prop> _spawnedRamps = new List<Prop>();
 
         public void Initialize(UIMenu mainMenu, MenuPool menuPool)
@@ -220,16 +223,39 @@ namespace YnixTrainer.Modules
             };
             autoMenu.AddItem(autoCancel);
 
-            var styleList = new List<dynamic> { "Seguro / Legal (Obedece Regras)", "Rápido / Desvia de Trânsito", "Fuga / Agressivo (Velocidade Total)" };
+            var styleList = new List<dynamic> { "Seguro / Legal (Obedece Regras)", "Rápido / Desvia de Trânsito", "Fuga / Agressivo (Insano / Sem Parar)" };
             var styleItem = new UIMenuListItem("Estilo de Condução", styleList, 0, "Altera o comportamento da IA no trânsito");
             styleItem.OnListChanged += (sender, index) =>
             {
-                if (index == 0) _autopilotStyle = 786603;      // Safe, obeys traffic lights, avoids cars
-                else if (index == 1) _autopilotStyle = 1074528293; // Fast, weaves through traffic, ignores red lights
-                else _autopilotStyle = 2883621;                   // Rushing, ultra aggressive
+                if (index == 0)
+                {
+                    _autopilotStyle = 786603;          // Safe, obeys traffic lights, polite
+                    _autopilotAggressiveness = 0.0f;
+                }
+                else if (index == 1)
+                {
+                    _autopilotStyle = 1074528293;      // Fast, weaves through traffic
+                    _autopilotAggressiveness = 0.6f;
+                }
+                else
+                {
+                    _autopilotStyle = 262143;          // 0x3FFFF: Ignore lights, wrong way, overtake, reckless
+                    _autopilotAggressiveness = 1.0f;
+                }
+
+                Ped p = Game.Player.Character;
+                if (_autopilotActive && p != null && p.Exists())
+                {
+                    Function.Call(Hash.SET_DRIVER_AGGRESSIVENESS, p.Handle, _autopilotAggressiveness);
+                    Function.Call(Hash.SET_DRIVE_TASK_DRIVING_STYLE, p.Handle, _autopilotStyle);
+                }
                 UI.Notify("~b~Estilo do Piloto Automático: ~w~" + styleList[index]);
             };
             autoMenu.AddItem(styleItem);
+
+            var rammerItem = new UIMenuCheckboxItem("Modo Aríete (Empurrar Tráfego)", _trafficRammer, "Abre caminho à força empurrando veículos que bloquearem a sua frente");
+            rammerItem.CheckboxEvent += (sender, state) => { _trafficRammer = state; };
+            autoMenu.AddItem(rammerItem);
 
             var speedList = new List<dynamic> { "60 KM/H (Passeio)", "90 KM/H (Padrão)", "130 KM/H (Rápido)", "180 KM/H (Máximo)" };
             var speedVals = new[] { 17.0f, 25.0f, 36.0f, 50.0f };
@@ -460,11 +486,12 @@ namespace YnixTrainer.Modules
             _autopilotDestination = wp;
             _autopilotStartTime = Game.GameTime;
             _brakeHoldCounter = 0;
+            _stuckCounter = 0;
             _autopilotActive = true;
 
             // Configure AI driver capability
             Function.Call(Hash.SET_DRIVER_ABILITY, player.Handle, 1.0f);
-            Function.Call(Hash.SET_DRIVER_AGGRESSIVENESS, player.Handle, 0.0f);
+            Function.Call(Hash.SET_DRIVER_AGGRESSIVENESS, player.Handle, _autopilotAggressiveness);
             Function.Call(Hash.SET_PED_KEEP_TASK, player.Handle, true);
 
             // Execute long range navigation native
@@ -687,8 +714,75 @@ namespace YnixTrainer.Modules
                             return;
                         }
 
-                        // Draw Autopilot HUD status
                         float currentKmh = v.Speed * 3.6f;
+
+                        // Traffic Rammer (Plow through blocking traffic)
+                        if (_trafficRammer || _autopilotAggressiveness >= 1.0f)
+                        {
+                            Vehicle[] ahead = World.GetNearbyVehicles(v.Position + v.ForwardVector * 4.5f, 3.5f);
+                            foreach (var b in ahead)
+                            {
+                                if (b != null && b.Exists() && b != v)
+                                {
+                                    Vector3 pushDir = (b.Position - v.Position).Normalized;
+                                    b.ApplyForce(pushDir * 2.5f + new Vector3(0, 0, 0.4f));
+                                }
+                            }
+                        }
+
+                        // Anti-Stuck & Overtake Watchdog
+                        if (currentKmh < 3.0f && (Game.GameTime - _autopilotStartTime > 2000))
+                        {
+                            _stuckCounter++;
+
+                            // If in Fast or Aggressive mode and blocked by traffic:
+                            if (_autopilotAggressiveness > 0.3f)
+                            {
+                                // Step 1: Honk and scare blocking drivers ahead (~1s stuck)
+                                if (_stuckCounter > 30)
+                                {
+                                    v.SoundHorn(800);
+
+                                    Vehicle[] blockingVehs = World.GetNearbyVehicles(v.Position + v.ForwardVector * 8.0f, 7.0f);
+                                    foreach (var b in blockingVehs)
+                                    {
+                                        if (b != null && b.Exists() && b != v)
+                                        {
+                                            Ped d = b.GetPedOnSeat(VehicleSeat.Driver);
+                                            if (d != null && d.Exists() && !d.IsPlayer)
+                                            {
+                                                d.Task.FleeFrom(player); // Panics and steers out of the way!
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Step 2: Push forward & re-issue overtake (~2.5s stuck)
+                                if (_stuckCounter > 90)
+                                {
+                                    _stuckCounter = 30; // reset
+                                    v.Speed = 8.0f; // Break out of dead stop
+                                    v.ApplyForce(v.ForwardVector * 2.0f);
+
+                                    Function.Call(Hash.SET_DRIVER_AGGRESSIVENESS, player.Handle, 1.0f);
+                                    Function.Call(Hash.SET_DRIVE_TASK_DRIVING_STYLE, player.Handle, 262143);
+                                    Function.Call(Hash.TASK_VEHICLE_DRIVE_TO_COORD_LONGRANGE,
+                                        player.Handle,
+                                        v.Handle,
+                                        _autopilotDestination.X, _autopilotDestination.Y, _autopilotDestination.Z,
+                                        _autopilotSpeed,
+                                        262143,
+                                        20.0f
+                                    );
+                                }
+                            }
+                        }
+                        else
+                        {
+                            _stuckCounter = 0;
+                        }
+
+                        // Draw Autopilot HUD status
                         string hudText = string.Format("~b~PILOTO AUTOMÁTICO ~w~| Distância: ~y~{0:0}m ~w~| Velocidade: ~g~{1:0} km/h ~w~| Segure ~r~[S] ~w~ou buzine", dist, currentKmh);
                         new UIText(hudText, new System.Drawing.Point(UI.WIDTH / 2, UI.HEIGHT - 35), 0.45f, System.Drawing.Color.White, GTA.Font.ChaletComprimeCologne, true, false, true).Draw();
 
