@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 using System.Windows.Forms;
 using GTA;
 using GTA.Math;
@@ -11,7 +12,8 @@ namespace YnixPolice.Systems
     {
         Idle,
         OrderingPullOver,
-        CopParkingBehind,
+        CopDrivingToParkBehind,
+        CopSteppingOut,
         CopWalkingToWindow,
         DialogAtWindow,
         CopReturningToCar
@@ -51,8 +53,12 @@ namespace YnixPolice.Systems
                     HandleOrderingPullOver(player);
                     break;
 
-                case VehicleStopState.CopParkingBehind:
-                    HandleCopParkingBehind(player);
+                case VehicleStopState.CopDrivingToParkBehind:
+                    HandleCopDrivingToParkBehind(player);
+                    break;
+
+                case VehicleStopState.CopSteppingOut:
+                    HandleCopSteppingOut(player);
                     break;
 
                 case VehicleStopState.CopWalkingToWindow:
@@ -83,7 +89,7 @@ namespace YnixPolice.Systems
             // Trigger traffic stop when player is in vehicle and has 1 wanted star
             if (Game.Player.WantedLevel == 1)
             {
-                InitiateStop(player, "Infração de Trânsito Detectada");
+                InitiateStop(player, "Infração de trânsito detectada");
             }
             // Or when driving at high speed near police with 0 stars
             else if (Game.Player.WantedLevel == 0)
@@ -94,7 +100,7 @@ namespace YnixPolice.Systems
                     Vehicle copVeh = PoliceUtils.FindClosestPoliceVehicle(player.Position, 55.0f);
                     if (copVeh != null)
                     {
-                        InitiateStop(player, "Excesso de Velocidade (" + (int)kmh + " KM/H)");
+                        InitiateStop(player, "Excesso de velocidade (" + (int)kmh + " km/h)");
                     }
                 }
             }
@@ -105,8 +111,7 @@ namespace YnixPolice.Systems
             Vehicle playerVeh = player.CurrentVehicle;
             if (playerVeh == null || !playerVeh.Exists()) return;
 
-            // Zero out native wanted level during the traffic stop so GTA V's native dispatch
-            // DOES NOT swarm the scene with multiple other police cars!
+            // Zero out wanted level so GTA V native dispatch DOES NOT flood the scene with other cruisers!
             Game.Player.WantedLevel = 0;
             Function.Call(Hash.SET_POLICE_IGNORE_PLAYER, Game.Player, true);
 
@@ -127,7 +132,7 @@ namespace YnixPolice.Systems
 
                 if (copModel.IsLoaded)
                 {
-                    Vector3 targetBehind = playerVeh.Position - playerVeh.ForwardVector * 40.0f;
+                    Vector3 targetBehind = playerVeh.Position - playerVeh.ForwardVector * 35.0f;
                     Vector3 spawnPos = World.GetNextPositionOnStreet(targetBehind);
                     if (spawnPos == Vector3.Zero) spawnPos = targetBehind;
 
@@ -172,18 +177,17 @@ namespace YnixPolice.Systems
             if (_copPed != null && _copPed.Exists())
             {
                 _copPed.BlockPermanentEvents = true;
-                _copPed.Task.ClearAllImmediately();
+                _copPed.Task.ClearAll();
             }
 
-            // If there is a passenger cop, calm him down so he doesn't shoot
             if (_passengerPed != null && _passengerPed.Exists())
             {
                 _passengerPed.BlockPermanentEvents = true;
-                _passengerPed.Task.ClearAllImmediately();
+                _passengerPed.Task.ClearAll();
                 _passengerPed.Weapons.Select(WeaponHash.Unarmed, true);
             }
 
-            // Dismiss any OTHER nearby police vehicles so only this car conducts the stop!
+            // Dismiss other nearby police units so ONLY this cruiser conducts the stop
             DismissOtherPoliceUnits(player.Position, _copVehicle);
 
             // Turn on lights and sirens
@@ -198,7 +202,8 @@ namespace YnixPolice.Systems
             CurrentState = VehicleStopState.OrderingPullOver;
             _stopStartTime = Game.GameTime;
 
-            UI.Notify("~b~POLÍCIA DE LOS SANTOS:~w~\n" + reason + "!\nEncoste o veículo no acostamento à direita e pare o carro.");
+            // Clean GTA V notification
+            UI.Notify("Polícia de Los Santos:\n" + reason + ".\nEncoste o veículo à direita e pare o carro.");
         }
 
         private void DismissOtherPoliceUnits(Vector3 playerPos, Vehicle stopVeh)
@@ -234,13 +239,13 @@ namespace YnixPolice.Systems
 
             Vehicle playerVeh = player.CurrentVehicle;
 
-            // Check if player speeds away (fleeing)
+            // Check if player fled by driving away fast
             if (playerVeh.Speed > 20.0f && World.GetDistance(player.Position, _copVehicle.Position) > 60.0f)
             {
                 _fledCheckCounter++;
                 if (_fledCheckCounter > 20)
                 {
-                    UI.Notify("~r~Você desobedeceu a ordem de parada! Perseguição armada iniciada!");
+                    UI.Notify("Você desobedeceu a ordem de parada! Perseguição iniciada.");
                     Game.Player.WantedLevel = 2;
                     Reset();
                     return;
@@ -251,37 +256,38 @@ namespace YnixPolice.Systems
                 _fledCheckCounter = 0;
             }
 
-            // If player slowed down to a stop
-            if (playerVeh.Speed < 1.2f)
+            // When player has slowed down to a full stop
+            if (playerVeh.Speed < 1.0f)
             {
-                CurrentState = VehicleStopState.CopParkingBehind;
+                CurrentState = VehicleStopState.CopDrivingToParkBehind;
                 _stopStartTime = Game.GameTime;
 
-                // Tell cop vehicle to pull up behind player
-                Vector3 parkPos = playerVeh.GetOffsetInWorldCoords(new Vector3(0f, -7.0f, 0f));
+                // Tell cop cruiser to drive to 4.5m directly behind player's car
+                Vector3 parkPos = playerVeh.GetOffsetInWorldCoords(new Vector3(0f, -5.5f, 0f));
                 if (_copPed != null && _copPed.Exists())
                 {
-                    _copPed.Task.ClearAllImmediately();
-                    _copPed.Task.DriveTo(_copVehicle, parkPos, 2.5f, 15.0f, 786468);
+                    _copPed.Task.ClearAll();
+                    _copPed.Task.DriveTo(_copVehicle, parkPos, 2.0f, 10.0f, 786468);
                 }
 
-                UI.Notify("~b~Veículo parado.~w~ A viatura policial está estacionando logo atrás de você.");
+                UI.Notify("Veículo parado. A viatura policial está estacionando logo atrás.");
             }
             else
             {
-                string hint = "~y~ORDEM DE PARADA POLICIAL ~w~| Encoste no acostamento à direita e pare (Segure [S] / [Espaço])";
-                new UIText(hint, new System.Drawing.Point(UI.WIDTH / 2, UI.HEIGHT - 40), 0.45f, System.Drawing.Color.White, GTA.Font.ChaletComprimeCologne, true, false, true).Draw();
+                // Standard clean GTA V prompt at bottom (no rainbow colors)
+                string hint = "Encoste no acostamento à direita e pare o veículo (Segure [S] ou [Espaço])";
+                DrawStandardText(hint, UI.HEIGHT - 45);
 
                 // Keep cop pursuing closely behind
                 if (_copPed != null && _copPed.Exists())
                 {
-                    Vector3 followPos = playerVeh.GetOffsetInWorldCoords(new Vector3(0f, -10.0f, 0f));
-                    _copPed.Task.DriveTo(_copVehicle, followPos, 5.0f, 28.0f, 786468);
+                    Vector3 followPos = playerVeh.GetOffsetInWorldCoords(new Vector3(0f, -9.0f, 0f));
+                    _copPed.Task.DriveTo(_copVehicle, followPos, 4.0f, 25.0f, 786468);
                 }
             }
         }
 
-        private void HandleCopParkingBehind(Ped player)
+        private void HandleCopDrivingToParkBehind(Ped player)
         {
             if (!player.IsInVehicle() || _copPed == null || !_copPed.Exists() || _copVehicle == null || !_copVehicle.Exists())
             {
@@ -289,29 +295,72 @@ namespace YnixPolice.Systems
                 return;
             }
 
-            float distToCop = World.GetDistance(_copVehicle.Position, player.Position);
+            Vehicle playerVeh = player.CurrentVehicle;
+            Vector3 parkPos = playerVeh.GetOffsetInWorldCoords(new Vector3(0f, -5.5f, 0f));
+            float distToPark = World.GetDistance(_copVehicle.Position, parkPos);
 
-            // Wait until cop vehicle is close (< 13m) and stopped, or 3.5s elapsed
-            if (distToCop < 14.0f && (_copVehicle.Speed < 1.0f || (Game.GameTime - _stopStartTime > 3500)))
+            // Re-assert drive to park position every 2 seconds if still moving
+            if (_copVehicle.Speed > 1.5f && distToPark > 3.5f)
+            {
+                _copPed.Task.DriveTo(_copVehicle, parkPos, 2.0f, 10.0f, 786468);
+            }
+
+            // Check if cop cruiser is properly positioned behind the player (within 4.5m of target spot) AND slow/stopped
+            if (distToPark < 4.5f || (distToPark < 8.0f && _copVehicle.Speed < 1.0f))
+            {
+                // Cruiser has arrived behind player!
+                // Brake to a full stop:
+                _copVehicle.Speed = 0f;
+                _copVehicle.HandbrakeOn = true;
+                _copPed.Task.ClearAll();
+
+                // Mute siren audio but keep lights flashing (official GTA V police procedure)
+                Function.Call((Hash)0x1B3C09291E53538F, _copVehicle.Handle, true); // SET_VEHICLE_HAS_MUTED_SIRENS
+
+                // Cop NATURALLY opens door and exits the vehicle (NO ClearAllImmediately!)
+                _copPed.Task.LeaveVehicle(_copVehicle, false);
+
+                // If passenger exists, passenger also steps out to cover
+                if (_passengerPed != null && _passengerPed.Exists())
+                {
+                    _passengerPed.Task.LeaveVehicle(_copVehicle, false);
+                }
+
+                CurrentState = VehicleStopState.CopSteppingOut;
+                _stopStartTime = Game.GameTime;
+
+                UI.Notify("O oficial está desembarcando da viatura.");
+            }
+            else
+            {
+                DrawStandardText("Aguarde a viatura policial estacionar atrás do seu veículo...", UI.HEIGHT - 45);
+            }
+        }
+
+        private void HandleCopSteppingOut(Ped player)
+        {
+            if (!player.IsInVehicle() || _copPed == null || !_copPed.Exists())
+            {
+                Reset();
+                return;
+            }
+
+            // Wait until cop has physically stepped out on his feet
+            if (!_copPed.IsInVehicle())
             {
                 CurrentState = VehicleStopState.CopWalkingToWindow;
                 _stopStartTime = Game.GameTime;
                 _lastCopWalkTime = 0;
 
-                // Cop steps out of cruiser
-                _copPed.Task.ClearAllImmediately();
-                _copPed.Task.LeaveVehicle(_copVehicle, false);
-
+                // Walk to driver window
                 Vehicle playerVeh = player.CurrentVehicle;
-                Vector3 driverWindow = playerVeh.GetOffsetInWorldCoords(new Vector3(-1.35f, 0.4f, 0f));
-                Function.Call(Hash.TASK_GO_TO_COORD_ANY_MEANS, _copPed.Handle, driverWindow.X, driverWindow.Y, driverWindow.Z, 1.2f, 0, 0, 786603, 0xbf800000);
-
-                UI.Notify("~b~O policial desceu da viatura e está caminhando até a sua janela...~w~\nAguarde no banco do motorista.");
+                Vector3 driverWindow = playerVeh.GetOffsetInWorldCoords(new Vector3(-1.35f, 0.35f, 0f));
+                Function.Call(Hash.TASK_GO_TO_COORD_ANY_MEANS, _copPed.Handle, driverWindow.X, driverWindow.Y, driverWindow.Z, 1.25f, 0, 0, 786603, 0xbf800000);
             }
             else
             {
-                string wText = "~b~Viatura policial estacionando logo atrás do seu carro...~w~";
-                new UIText(wText, new System.Drawing.Point(UI.WIDTH / 2, UI.HEIGHT - 40), 0.45f, System.Drawing.Color.White, GTA.Font.ChaletComprimeCologne, true, false, true).Draw();
+                // Still opening door / getting out
+                DrawStandardText("Aguarde o oficial se aproximar...", UI.HEIGHT - 45);
             }
         }
 
@@ -326,34 +375,33 @@ namespace YnixPolice.Systems
             // If player steps on gas while cop is walking: FLED!
             if (player.CurrentVehicle.Speed > 6.0f)
             {
-                UI.Notify("~r~Fuga em flagrante! Perseguição armada iniciada!");
+                UI.Notify("Fuga em flagrante! Perseguição armada iniciada!");
                 Game.Player.WantedLevel = 2;
                 Reset();
                 return;
             }
 
             Vehicle playerVeh = player.CurrentVehicle;
-            Vector3 driverWindow = playerVeh.GetOffsetInWorldCoords(new Vector3(-1.35f, 0.4f, 0f));
+            Vector3 driverWindow = playerVeh.GetOffsetInWorldCoords(new Vector3(-1.35f, 0.35f, 0f));
             float dist = World.GetDistance(_copPed.Position, driverWindow);
 
             // Re-issue walking only every 3.5s so cop doesn't freeze
             if (Game.GameTime - _lastCopWalkTime > 3500)
             {
                 _lastCopWalkTime = Game.GameTime;
-                Function.Call(Hash.TASK_GO_TO_COORD_ANY_MEANS, _copPed.Handle, driverWindow.X, driverWindow.Y, driverWindow.Z, 1.2f, 0, 0, 786603, 0xbf800000);
+                Function.Call(Hash.TASK_GO_TO_COORD_ANY_MEANS, _copPed.Handle, driverWindow.X, driverWindow.Y, driverWindow.Z, 1.25f, 0, 0, 786603, 0xbf800000);
             }
 
-            if (dist < 2.2f || (Game.GameTime - _stopStartTime > 14000))
+            if (dist < 1.6f || (Game.GameTime - _stopStartTime > 16000))
             {
                 CurrentState = VehicleStopState.DialogAtWindow;
-                _copPed.Task.ClearAllImmediately();
+                _copPed.Task.ClearAll();
                 Function.Call(Hash.TASK_TURN_PED_TO_FACE_ENTITY, _copPed.Handle, player.Handle, 800);
                 Function.Call(Hash.TASK_START_SCENARIO_IN_PLACE, _copPed.Handle, "WORLD_HUMAN_COP_IDLES", 0, true);
             }
             else
             {
-                string waitNotice = "~b~Oficial se aproximando da janela do motorista...~w~";
-                new UIText(waitNotice, new System.Drawing.Point(UI.WIDTH / 2, UI.HEIGHT - 40), 0.45f, System.Drawing.Color.White, GTA.Font.ChaletComprimeCologne, true, false, true).Draw();
+                DrawStandardText("Oficial se aproximando da janela do motorista...", UI.HEIGHT - 45);
             }
         }
 
@@ -365,7 +413,7 @@ namespace YnixPolice.Systems
                 return;
             }
 
-            // STRICT CHECK: If player stepped out of vehicle or is knocked down, stop the window dialog immediately!
+            // STRICT CHECK: If player stepped out or was knocked down, cancel window dialog immediately!
             if (!player.IsInVehicle() || player.IsDead || player.IsRagdoll)
             {
                 Reset();
@@ -375,19 +423,19 @@ namespace YnixPolice.Systems
             // Check if player fled by accelerating
             if (player.CurrentVehicle.Speed > 7.0f)
             {
-                UI.Notify("~r~Fuga de fiscalização policial! Reforços acionados!");
+                UI.Notify("Fuga de fiscalização policial! Reforços acionados.");
                 Game.Player.WantedLevel = 2;
                 Reset();
                 return;
             }
 
-            // Interactive dialogue box on screen
-            string dialogLine1 = "~b~Oficial:~w~ \"Boa tarde senhor. Documentos do veículo e habilitação, por favor.\"";
-            string dialogLine2 = string.Format("Pressione ~g~[{0}]~w~ Entregar Docs & Pagar Multa (${1}) | ~y~[E]~w~ Pedir Advertência | ~r~[{2}]~w~ Descer e Render-se",
+            // CLEAN GTA V STANDARD SUBTITLES (NO RAINBOW COLOR TAGS)
+            string dialogLine1 = "Oficial: \"Boa tarde senhor. Documentos do veículo e habilitação, por favor.\"";
+            string dialogLine2 = string.Format("Pressione [{0}] Pagar Multa (${1}) | [E] Pedir Advertência | [{2}] Descer e Render-se",
                 ConfigManager.AcceptFineKey.ToString(), ConfigManager.TicketFineAmount, ConfigManager.SurrenderKey.ToString());
 
-            new UIText(dialogLine1, new System.Drawing.Point(UI.WIDTH / 2, UI.HEIGHT - 70), 0.45f, System.Drawing.Color.White, GTA.Font.ChaletComprimeCologne, true, false, true).Draw();
-            new UIText(dialogLine2, new System.Drawing.Point(UI.WIDTH / 2, UI.HEIGHT - 40), 0.42f, System.Drawing.Color.FromArgb(240, 240, 240), GTA.Font.ChaletComprimeCologne, true, false, true).Draw();
+            DrawStandardSubtitle(dialogLine1, UI.HEIGHT - 75);
+            DrawStandardHint(dialogLine2, UI.HEIGHT - 45);
 
             // Option 1: Hand over documents & Pay fine
             if (Game.IsKeyPressed(ConfigManager.AcceptFineKey))
@@ -398,14 +446,14 @@ namespace YnixPolice.Systems
                     Game.Player.WantedLevel = 0;
 
                     PoliceUtils.PlayPaperSound();
-                    UI.Notify("~g~Documentos entregues! Multa de $" + ConfigManager.TicketFineAmount + " quitada.\n~w~Oficial: \"Tudo certo. Dirija com atenção e tenha um bom dia!\"");
+                    UI.Notify("Documentos entregues. Multa de $" + ConfigManager.TicketFineAmount + " quitada.\nOficial: \"Tudo em ordem. Dirija com atenção e tenha um bom dia!\"");
 
                     CurrentState = VehicleStopState.CopReturningToCar;
                     ReturnCopToCar();
                 }
                 else
                 {
-                    UI.Notify("~r~Você não tem dinheiro suficiente para pagar a multa!");
+                    UI.Notify("Você não possui dinheiro suficiente para pagar a multa.");
                 }
             }
             // Option 2: Request verbal warning (50% chance)
@@ -416,13 +464,13 @@ namespace YnixPolice.Systems
                 {
                     Game.Player.WantedLevel = 0;
                     PoliceUtils.PlayPaperSound();
-                    UI.Notify("~g~Oficial: \"Vou deixar passar apenas como uma advertência desta vez. Não repita isso!\"");
+                    UI.Notify("Oficial: \"Vou liberar apenas com uma advertência verbal desta vez. Dirija devagar!\"");
                     CurrentState = VehicleStopState.CopReturningToCar;
                     ReturnCopToCar();
                 }
                 else
                 {
-                    UI.Notify("~r~Oficial: \"Sem desculpas hoje, senhor. A infração é grave e a multa é obrigatória.\"");
+                    UI.Notify("Oficial: \"Sem justificativa hoje, senhor. A infração é clara e a multa é devida.\"");
                 }
             }
             // Option 3: Step out and surrender
@@ -447,13 +495,21 @@ namespace YnixPolice.Systems
                     _copPed.Task.EnterVehicle(_copVehicle, VehicleSeat.Driver);
                 }
             }
+            if (_passengerPed != null && _passengerPed.Exists())
+            {
+                _passengerPed.Task.ClearAll();
+                if (_copVehicle != null && _copVehicle.Exists())
+                {
+                    _passengerPed.Task.EnterVehicle(_copVehicle, VehicleSeat.Passenger);
+                }
+            }
             _stopStartTime = Game.GameTime;
         }
 
         private void HandleCopReturning(Ped player)
         {
-            // Wait for cop to get in car, then turn off sirens and finish
-            if (Game.GameTime - _stopStartTime > 4000)
+            // Wait for cop to enter vehicle, then turn off sirens and finish
+            if (Game.GameTime - _stopStartTime > 4500)
             {
                 if (_copVehicle != null && _copVehicle.Exists())
                 {
@@ -485,6 +541,22 @@ namespace YnixPolice.Systems
             _copVehicle = null;
             _copPed = null;
             _passengerPed = null;
+        }
+
+        // Standard GTA V clean subtitles and text rendering
+        private static void DrawStandardSubtitle(string text, int yPos)
+        {
+            new UIText(text, new Point(UI.WIDTH / 2, yPos), 0.44f, Color.White, GTA.Font.ChaletComprimeCologne, true, true, true).Draw();
+        }
+
+        private static void DrawStandardHint(string text, int yPos)
+        {
+            new UIText(text, new Point(UI.WIDTH / 2, yPos), 0.40f, Color.FromArgb(230, 230, 230), GTA.Font.ChaletComprimeCologne, true, true, true).Draw();
+        }
+
+        private static void DrawStandardText(string text, int yPos)
+        {
+            new UIText(text, new Point(UI.WIDTH / 2, yPos), 0.42f, Color.White, GTA.Font.ChaletComprimeCologne, true, true, true).Draw();
         }
     }
 }

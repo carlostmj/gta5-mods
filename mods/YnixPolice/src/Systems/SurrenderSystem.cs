@@ -87,7 +87,7 @@ namespace YnixPolice.Systems
                 Ped onFootCop = PoliceUtils.FindClosestOnFootPoliceOfficer(player.Position, 22.0f);
                 if (onFootCop != null)
                 {
-                    string hint = string.Format("~y~POLICIAL A PÉ PRÓXIMO ~w~| Pressione ~g~[{0}]~w~ para Mãos na Cabeça e Render-se", ConfigManager.SurrenderKey.ToString());
+                    string hint = string.Format("Pressione [{0}] para erguer as mãos e se render", ConfigManager.SurrenderKey.ToString());
                     new UIText(hint, new System.Drawing.Point(UI.WIDTH / 2, UI.HEIGHT - 65), 0.42f, System.Drawing.Color.White, GTA.Font.ChaletComprimeCologne, true, false, true).Draw();
 
                     if (Game.IsKeyPressed(ConfigManager.SurrenderKey))
@@ -102,7 +102,7 @@ namespace YnixPolice.Systems
         {
             if (officer == null || !officer.Exists() || officer.IsDead || officer.IsInVehicle())
             {
-                UI.Notify("~r~Nenhum policial a pé por perto para efetuar a rendição!");
+                UI.Notify("Nenhum policial a pé por perto para efetuar a rendição.");
                 return;
             }
 
@@ -139,7 +139,7 @@ namespace YnixPolice.Systems
             Function.Call(Hash.TASK_GO_TO_ENTITY, _arrestingOfficer.Handle, player.Handle, -1, 1.0f, 2.8f, 0, 0);
             _lastGoToTime = Game.GameTime;
 
-            UI.Notify("~b~Mãos na cabeça! ~w~Aguarde o policial se aproximar fisicamente para algemá-lo.");
+            UI.Notify("Mãos na cabeça. Aguarde o policial se aproximar para algemá-lo.");
         }
 
         private void HandleHandsUpWaiting(Ped player)
@@ -160,7 +160,7 @@ namespace YnixPolice.Systems
                 _arrestingOfficer = PoliceUtils.FindClosestOnFootPoliceOfficer(player.Position, 25.0f);
                 if (_arrestingOfficer == null)
                 {
-                    UI.Notify("~y~Nenhum policial alcançou você. Rendição cancelada.");
+                    UI.Notify("Rendição cancelada.");
                     CancelSurrender(player);
                     return;
                 }
@@ -190,19 +190,19 @@ namespace YnixPolice.Systems
                 // Play metallic handcuff ratchet sound
                 PoliceUtils.PlayHandcuffSound();
 
-                UI.Notify("~y~O policial alcançou você e colocou as algemas!");
+                UI.Notify("O policial alcançou você e colocou as algemas.");
             }
             else
             {
                 // If 20 seconds passed and officer NEVER reached (e.g. stuck behind fence/mesh), cancel cleanly
                 if (Game.GameTime - _stateStartTime > 20000)
                 {
-                    UI.Notify("~y~O policial ficou preso no caminho. Rendição cancelada.");
+                    UI.Notify("Rendição cancelada.");
                     CancelSurrender(player);
                     return;
                 }
 
-                string waitText = string.Format("~b~Policial correndo até você... ~w~({0:0.0}m)", dist);
+                string waitText = string.Format("Policial se aproximando... ({0:0.0}m)", dist);
                 new UIText(waitText, new System.Drawing.Point(UI.WIDTH / 2, UI.HEIGHT - 40), 0.42f, System.Drawing.Color.White, GTA.Font.ChaletComprimeCologne, true, false, true).Draw();
             }
         }
