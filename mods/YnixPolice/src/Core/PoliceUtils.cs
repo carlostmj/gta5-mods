@@ -1,5 +1,6 @@
 using System;
 using GTA;
+using GTA.Math;
 using GTA.Native;
 
 namespace YnixPolice.Core
@@ -47,7 +48,7 @@ namespace YnixPolice.Core
             return false;
         }
 
-        public static Ped FindClosestPoliceOfficer(GTA.Math.Vector3 pos, float radius)
+        public static Ped FindClosestPoliceOfficer(Vector3 pos, float radius)
         {
             Ped[] peds = World.GetNearbyPeds(pos, radius);
             Ped closest = null;
@@ -67,7 +68,7 @@ namespace YnixPolice.Core
             return closest;
         }
 
-        public static Ped FindClosestOnFootPoliceOfficer(GTA.Math.Vector3 pos, float radius)
+        public static Ped FindClosestOnFootPoliceOfficer(Vector3 pos, float radius)
         {
             Ped[] peds = World.GetNearbyPeds(pos, radius);
             Ped closest = null;
@@ -87,7 +88,7 @@ namespace YnixPolice.Core
             return closest;
         }
 
-        public static Vehicle FindClosestPoliceVehicle(GTA.Math.Vector3 pos, float radius)
+        public static Vehicle FindClosestPoliceVehicle(Vector3 pos, float radius)
         {
             Vehicle[] vehs = World.GetNearbyVehicles(pos, radius);
             Vehicle closest = null;
@@ -102,6 +103,32 @@ namespace YnixPolice.Core
                         minD = d;
                         closest = v;
                     }
+                }
+            }
+            return closest;
+        }
+
+        public static Vector3 GetClosestPoliceStation(Vector3 currentPos)
+        {
+            Vector3[] stations = new[]
+            {
+                new Vector3(425.1f, -979.5f, 30.7f),    // Mission Row
+                new Vector3(-448.2f, 6012.3f, 31.7f),   // Paleto Bay
+                new Vector3(1853.2f, 3687.5f, 34.2f),   // Sandy Shores
+                new Vector3(-1108.2f, -845.6f, 19.3f),  // Vespucci
+                new Vector3(638.5f, 1.4f, 82.7f),       // Vinewood
+                new Vector3(-561.6f, -131.6f, 38.2f)    // Rockford Hills
+            };
+
+            Vector3 closest = stations[0];
+            float minDist = float.MaxValue;
+            foreach (var pos in stations)
+            {
+                float d = World.GetDistance(currentPos, pos);
+                if (d < minDist)
+                {
+                    minDist = d;
+                    closest = pos;
                 }
             }
             return closest;
