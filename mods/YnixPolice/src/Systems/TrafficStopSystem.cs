@@ -231,6 +231,7 @@ namespace YnixPolice.Systems
 
         private void TriggerFleeing(string msg = "Fuga em flagrante! Perseguição armada iniciada!")
         {
+            RemoveCopBlip();
             UI.Notify(msg);
             Game.Player.WantedLevel = 2;
             Reset();
@@ -245,24 +246,34 @@ namespace YnixPolice.Systems
             }
 
             Vehicle playerVeh = player.CurrentVehicle;
+            int elapsedMs = Game.GameTime - _stopStartTime;
+            float distToCop = World.GetDistance(player.Position, _copVehicle.Position);
+            float kmh = playerVeh.Speed * 3.6f;
 
-            // Check if player fled by driving away fast
-            if (playerVeh.Speed > 18.0f && World.GetDistance(player.Position, _copVehicle.Position) > 50.0f)
+            // REALISTIC FLEEING LOGIC:
+            // 1. High speed evasion: Driving faster than 90 km/h or pulling far ahead (> 75m)
+            if (kmh > 90.0f || (kmh > 65.0f && distToCop > 75.0f))
             {
                 _fledCheckCounter++;
-                if (_fledCheckCounter > 15)
+                if (_fledCheckCounter > 25)
                 {
-                    TriggerFleeing("Você desobedeceu a ordem de parada! Perseguição armada iniciada.");
+                    TriggerFleeing("Você abriu fuga em alta velocidade! Perseguição armada iniciada.");
                     return;
                 }
+            }
+            // 2. Timeout: Player completely ignored the order to pull over for 18 seconds without stopping
+            else if (elapsedMs > 18000 && playerVeh.Speed > 2.5f)
+            {
+                TriggerFleeing("Tempo esgotado para encostar o veículo! Perseguição iniciada.");
+                return;
             }
             else
             {
                 _fledCheckCounter = 0;
             }
 
-            // When player has slowed down to a full stop
-            if (playerVeh.Speed < 1.0f)
+            // SUCCESS: When player slows down and stops at the side of the road
+            if (playerVeh.Speed < 1.2f)
             {
                 CurrentState = VehicleStopState.CopDrivingToParkBehind;
                 _stopStartTime = Game.GameTime;
@@ -272,15 +283,17 @@ namespace YnixPolice.Systems
             }
             else
             {
-                string hint = "Encoste no acostamento à direita e pare o veículo (Segure [S] ou [Espaço])";
+                int remainingSec = Math.Max(1, (18000 - elapsedMs) / 1000);
+                string hint = string.Format("Encoste no acostamento à direita e pare o carro ({0}s para encostar)", remainingSec);
                 DrawStandardText(hint, UI.HEIGHT - 45);
 
-                // Keep cop pursuing closely behind - THROTTLED to once every 2 seconds
-                if (_copPed != null && _copPed.Exists() && (Game.GameTime - _lastDriveTime > 2000))
+                // Keep cop pursuing closely behind at matching speed
+                if (_copPed != null && _copPed.Exists() && (Game.GameTime - _lastDriveTime > 1800))
                 {
                     _lastDriveTime = Game.GameTime;
                     Vector3 followPos = playerVeh.GetOffsetInWorldCoords(new Vector3(0f, -8.0f, 0f));
-                    _copPed.Task.DriveTo(_copVehicle, followPos, 3.0f, 22.0f, 786603);
+                    float chaseSpeed = Math.Max(playerVeh.Speed * 1.15f, 10.0f);
+                    _copPed.Task.DriveTo(_copVehicle, followPos, 3.0f, chaseSpeed, 786603);
                 }
             }
         }
@@ -560,6 +573,7 @@ namespace YnixPolice.Systems
                 {
                     CurrentState = VehicleStopState.ArrestingPlayer;
                     _stopStartTime = Game.GameTime;
+                    RemoveCopBlip();
 
                     if (_copPed != null && _copPed.Exists())
                     {
@@ -593,6 +607,7 @@ namespace YnixPolice.Systems
             {
                 CurrentState = VehicleStopState.FadingToStation;
                 _stopStartTime = Game.GameTime;
+                RemoveCopBlip();
                 Function.Call(Hash.DO_SCREEN_FADE_OUT, 1200);
             }
         }
@@ -674,11 +689,8 @@ namespace YnixPolice.Systems
             // Re-enable backup dispatches
             SetDispatchServicesEnabled(true);
 
-            if (_copBlip != null && _copBlip.Exists())
-            {
-                _copBlip.Remove();
-                _copBlip = null;
-            }
+            RemoveCopBlip();
+
             if (_copPed != null && _copPed.Exists())
             {
                 _copPed.BlockPermanentEvents = false;
@@ -690,6 +702,31 @@ namespace YnixPolice.Systems
             _copVehicle = null;
             _copPed = null;
             _passengerPed = null;
+        }
+
+        private void RemoveCopBlip()
+        {
+            try
+            {
+                if (_copBlip != null)
+                {
+                    if (_copBlip.Exists())
+                    {
+                        _copBlip.Remove();
+                    }
+                    _copBlip = null;
+                }
+
+                if (_copVehicle != null && _copVehicle.Exists())
+                {
+                    Blip b = _copVehicle.CurrentBlip;
+                    if (b != null && b.Exists())
+                    {
+                        b.Remove();
+                    }
+                }
+            }
+            catch { }
         }
 
         // Standard GTA V clean subtitles and text rendering
