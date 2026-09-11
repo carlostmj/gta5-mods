@@ -87,10 +87,15 @@ namespace YnixPolice.Systems
             Vehicle playerVeh = player.CurrentVehicle;
             if (playerVeh == null || !playerVeh.Exists()) return;
 
-            // Trigger traffic stop when player is in vehicle and has 1 wanted star
+            // REALISM CHECK: Only initiate a traffic stop if a police cruiser is ACTUALLY NEARBY (within 70m)!
+            // If you get 1 star but no cops are around, you are just being searched for and can try to flee/hide!
             if (Game.Player.WantedLevel == 1)
             {
-                InitiateStop(player, "Infração de trânsito detectada");
+                Vehicle nearbyCop = PoliceUtils.FindClosestPoliceVehicle(player.Position, 70.0f);
+                if (nearbyCop != null && nearbyCop.Exists())
+                {
+                    InitiateStop(player, "Infração de trânsito detectada", nearbyCop);
+                }
             }
             // Or when driving at high speed near police with 0 stars
             else if (Game.Player.WantedLevel == 0)
@@ -98,17 +103,17 @@ namespace YnixPolice.Systems
                 float kmh = playerVeh.Speed * 3.6f;
                 if (kmh >= ConfigManager.SpeedingThresholdKMH)
                 {
-                    Vehicle copVeh = PoliceUtils.FindClosestPoliceVehicle(player.Position, 55.0f);
-                    if (copVeh != null)
+                    Vehicle nearbyCop = PoliceUtils.FindClosestPoliceVehicle(player.Position, 55.0f);
+                    if (nearbyCop != null && nearbyCop.Exists())
                     {
                         Game.Player.WantedLevel = 1;
-                        InitiateStop(player, "Excesso de velocidade (" + (int)kmh + " km/h)");
+                        InitiateStop(player, "Excesso de velocidade (" + (int)kmh + " km/h)", nearbyCop);
                     }
                 }
             }
         }
 
-        private void InitiateStop(Ped player, string reason)
+        private void InitiateStop(Ped player, string reason, Vehicle designatedCruiser)
         {
             Vehicle playerVeh = player.CurrentVehicle;
             if (playerVeh == null || !playerVeh.Exists()) return;
@@ -122,47 +127,19 @@ namespace YnixPolice.Systems
             // Suppress native lethal aggression from random cops
             Function.Call(Hash.SET_POLICE_IGNORE_PLAYER, Game.Player, true);
 
-            // Dismiss other random police units in the area so ONLY our cruiser conducts the stop
-            DismissOtherPoliceUnits(player.Position, null);
-
-            // Look for an existing cruiser that is ACTUALLY BEHIND player and driving in the SAME DIRECTION
-            _copVehicle = FindValidCruiserBehind(playerVeh);
-
-            // If no valid cruiser is behind in the same lane, spawn one cleanly 22m directly behind in the same lane!
+            // Assign the actual nearby cruiser that spotted the player
+            _copVehicle = designatedCruiser;
             if (_copVehicle == null || !_copVehicle.Exists())
             {
-                Model copModel = new Model(VehicleHash.Police3);
-                if (!copModel.IsLoaded) copModel.Request(1200);
-
-                if (!copModel.IsLoaded)
-                {
-                    copModel = new Model(VehicleHash.Police);
-                    if (!copModel.IsLoaded) copModel.Request(1200);
-                }
-
-                if (copModel.IsLoaded)
-                {
-                    Vector3 spawnPos = playerVeh.GetOffsetInWorldCoords(new Vector3(0f, -22.0f, 0f));
-                    _copVehicle = World.CreateVehicle(copModel, spawnPos, playerVeh.Heading);
-                    if (_copVehicle != null && _copVehicle.Exists())
-                    {
-                        _copVehicle.Speed = Math.Max(playerVeh.Speed * 0.9f, 5.0f);
-                        Model pedModel = new Model(PedHash.Cop01SMY);
-                        if (!pedModel.IsLoaded) pedModel.Request(1200);
-                        if (pedModel.IsLoaded)
-                        {
-                            _copPed = _copVehicle.CreatePedOnSeat(VehicleSeat.Driver, pedModel);
-                        }
-                        pedModel.MarkAsNoLongerNeeded();
-                    }
-                }
-                copModel.MarkAsNoLongerNeeded();
+                Reset();
+                return;
             }
-            else
-            {
-                _copPed = _copVehicle.GetPedOnSeat(VehicleSeat.Driver);
-                _passengerPed = _copVehicle.GetPedOnSeat(VehicleSeat.Passenger);
-            }
+
+            // Dismiss any other random police units in the area so ONLY this cruiser conducts the stop
+            DismissOtherPoliceUnits(player.Position, _copVehicle);
+
+            _copPed = _copVehicle.GetPedOnSeat(VehicleSeat.Driver);
+            _passengerPed = _copVehicle.GetPedOnSeat(VehicleSeat.Passenger);
 
             if (_copVehicle == null || !_copVehicle.Exists())
             {
