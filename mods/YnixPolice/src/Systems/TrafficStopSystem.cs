@@ -241,12 +241,7 @@ namespace YnixPolice.Systems
         {
             try
             {
-                Function.Call((Hash)0xDC0F817884CDD856, 1, enable); // DT_PoliceAutomobile
-                Function.Call((Hash)0xDC0F817884CDD856, 2, enable); // DT_PoliceHelicopter
-                Function.Call((Hash)0xDC0F817884CDD856, 4, enable); // DT_SwatAutomobile
-                Function.Call((Hash)0xDC0F817884CDD856, 6, enable); // DT_PoliceRider
-                Function.Call((Hash)0xDC0F817884CDD856, 7, enable); // DT_PoliceVehicleRequest
-                Function.Call((Hash)0xDC0F817884CDD856, 8, enable); // DT_PoliceRoadBlock
+                Function.Call(Hash.SET_DISPATCH_COPS_FOR_PLAYER, Game.Player, enable);
             }
             catch { }
         }
@@ -344,7 +339,7 @@ namespace YnixPolice.Systems
                 _copPed.Task.ClearAll();
 
                 // Mute siren audio but keep lights flashing
-                try { Function.Call((Hash)0x1B3C09291E53538F, _copVehicle.Handle, true); } catch { }
+                try { _copVehicle.IsSirenSilent = true; } catch { }
 
                 // Cop NATURALLY opens door and exits the vehicle (smooth exit, no warping)
                 _copPed.Task.LeaveVehicle(_copVehicle, false);
