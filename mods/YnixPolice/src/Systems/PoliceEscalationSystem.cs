@@ -8,16 +8,24 @@ namespace YnixPolice.Systems
     public class PoliceEscalationSystem
     {
         private int _lastEscalationCheck = 0;
+        private int _lastPacifyCheck = 0;
 
         public void OnTick()
         {
-            if (!ConfigManager.NonLethalAtLowStars) return;
-
             Ped player = Game.Player.Character;
             if (player == null || !player.Exists() || player.IsDead) return;
 
             int wanted = Game.Player.WantedLevel;
-            if (wanted <= 0 || wanted > 2) return;
+
+            // ABSOLUTE RULE: If player has 0 wanted stars, NO COP SHOULD EVER ATTACK OR SHOOT!
+            if (wanted == 0)
+            {
+                PacifyNearbyCops(player);
+                return;
+            }
+
+            if (!ConfigManager.NonLethalAtLowStars) return;
+            if (wanted > 2) return;
 
             int now = Game.GameTime;
             if (now - _lastEscalationCheck < 800) return;
@@ -37,7 +45,7 @@ namespace YnixPolice.Systems
             Ped[] nearbyPeds = World.GetNearbyPeds(player.Position, 50.0f);
             foreach (var p in nearbyPeds)
             {
-                if (PoliceUtils.IsCop(p))
+                if (PoliceUtils.IsCop(p) && !p.IsDead)
                 {
                     if (!p.Weapons.HasWeapon(WeaponHash.StunGun))
                     {
@@ -46,6 +54,30 @@ namespace YnixPolice.Systems
                     if (p.Weapons.Current.Hash != WeaponHash.StunGun && p.Weapons.Current.Hash != WeaponHash.Nightstick)
                     {
                         p.Weapons.Select(WeaponHash.StunGun, true);
+                    }
+                }
+            }
+        }
+
+        public void PacifyNearbyCops(Ped player)
+        {
+            int now = Game.GameTime;
+            if (now - _lastPacifyCheck < 400) return;
+            _lastPacifyCheck = now;
+
+            Ped[] nearby = World.GetNearbyPeds(player.Position, 80.0f);
+            foreach (var p in nearby)
+            {
+                if (PoliceUtils.IsCop(p) && !p.IsDead)
+                {
+                    if (p.IsInCombatAgainst(player) || p.IsShooting )
+                    {
+                        p.BlockPermanentEvents = false;
+                        p.Task.ClearAll();
+                        Function.Call(Hash.CLEAR_PED_TASKS, p.Handle);
+                        
+                        p.Weapons.Select(WeaponHash.Unarmed, true);
+                        p.Task.WanderAround();
                     }
                 }
             }

@@ -300,6 +300,9 @@ namespace YnixPolice.Systems
             if (_arrestingOfficer != null && _arrestingOfficer.Exists())
             {
                 _arrestingOfficer.BlockPermanentEvents = false;
+                _arrestingOfficer.Task.ClearAll();
+                _arrestingOfficer.Weapons.Select(WeaponHash.Unarmed, true);
+                _arrestingOfficer.Task.WanderAround();
             }
             _arrestingOfficer = null;
         }

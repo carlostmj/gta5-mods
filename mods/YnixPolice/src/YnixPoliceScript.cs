@@ -22,6 +22,7 @@ namespace YnixPolice
                 _trafficStop = new TrafficStopSystem();
                 _surrender = new SurrenderSystem();
                 _escalation = new PoliceEscalationSystem();
+                if (Game.Player.WantedLevel == 0 && Game.Player.Character != null) _escalation.PacifyNearbyCops(Game.Player.Character);
 
                 Tick += OnTick;
                 Interval = 0;

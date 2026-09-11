@@ -694,10 +694,16 @@ namespace YnixPolice.Systems
             if (_copPed != null && _copPed.Exists())
             {
                 _copPed.BlockPermanentEvents = false;
+                _copPed.Task.ClearAll();
+                _copPed.Weapons.Select(WeaponHash.Unarmed, true);
+                _copPed.Task.WanderAround();
             }
             if (_passengerPed != null && _passengerPed.Exists())
             {
                 _passengerPed.BlockPermanentEvents = false;
+                _passengerPed.Task.ClearAll();
+                _passengerPed.Weapons.Select(WeaponHash.Unarmed, true);
+                _passengerPed.Task.WanderAround();
             }
             _copVehicle = null;
             _copPed = null;
