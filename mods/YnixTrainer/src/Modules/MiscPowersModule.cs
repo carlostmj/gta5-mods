@@ -107,7 +107,10 @@ namespace YnixTrainer.Modules
                     player.CanRagdoll = true;
                     Function.Call(Hash.SET_PED_CAN_RAGDOLL, player.Handle, true);
                     Function.Call(Hash.SET_ENTITY_PROOFS, player.Handle, false, false, false, false, false, false, false, false);
-                    player.IsInvincible = false;
+                    if (!PlayerModule.IsGodModeActive)
+                    {
+                        player.IsInvincible = false;
+                    }
                 }
             }
         }

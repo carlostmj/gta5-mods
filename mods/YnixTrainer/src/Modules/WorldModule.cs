@@ -18,6 +18,13 @@ namespace YnixTrainer.Modules
         {
             var worldMenu = menuPool.AddSubMenu(mainMenu, Localization.Get("General", "SubmenuWorld", "Mundo e Tempo"));
 
+            // Bullet Time / Slow Motion
+            var bulletMenu = menuPool.AddSubMenu(worldMenu, "Câmera Lenta / Bullet Time (Modo Matrix)");
+            AddBulletTimeOption(bulletMenu, "Velocidade Normal (1.0x)", 1.0f);
+            AddBulletTimeOption(bulletMenu, "Câmera Lenta Leve (0.7x)", 0.7f);
+            AddBulletTimeOption(bulletMenu, "Câmera Lenta Média (0.4x)", 0.4f);
+            AddBulletTimeOption(bulletMenu, "Modo Matrix Extremo (0.15x)", 0.15f);
+
             // Weather
             var weatherMenu = menuPool.AddSubMenu(worldMenu, Localization.Get("World", "Weather", "Alterar Clima"));
             AddWeatherOption(weatherMenu, Localization.Get("World", "SetClear", "Limpo"), Weather.Clear);
@@ -80,6 +87,18 @@ namespace YnixTrainer.Modules
                 World.GravityLevel = _moonGravity ? 1 : 0;
             };
             worldMenu.AddItem(moonItem);
+        }
+
+        private void AddBulletTimeOption(UIMenu menu, string label, float scale)
+        {
+            var item = new UIMenuItem(label, "Ajusta a velocidade do jogo para " + scale + "x");
+            item.Activated += (sender, selected) =>
+            {
+                Game.TimeScale = scale;
+                Function.Call(Hash.SET_TIME_SCALE, scale);
+                UI.Notify("~b~Câmera Lenta: ~w~" + label);
+            };
+            menu.AddItem(item);
         }
 
         private void AddFilterItem(UIMenu menu, string label, string modifierName)

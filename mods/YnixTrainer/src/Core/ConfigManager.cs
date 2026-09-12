@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using GTA;
 
@@ -11,13 +11,15 @@ namespace YnixTrainer.Core
 
         private static string _language = "pt-BR";
         private static string _menuKey = "F4";
-        private static string _version = "v1.0.0.0";
+        private static string _version = "v1.6.0.0";
         private static string _title = "Ynix Trainer";
+        private static string _speedUnit = "KM/H";
 
         public static string Language { get { return _language; } set { _language = value; } }
         public static string MenuKey { get { return _menuKey; } set { _menuKey = value; } }
         public static string Version { get { return _version; } set { _version = value; } }
         public static string Title { get { return _title; } set { _title = value; } }
+        public static string SpeedUnit { get { return _speedUnit; } set { _speedUnit = value; } }
 
         public static void Load()
         {
@@ -28,8 +30,9 @@ namespace YnixTrainer.Core
                     _settings = ScriptSettings.Load(ConfigPath);
                     _language = _settings.GetValue("General", "Language", "pt-BR");
                     _menuKey = _settings.GetValue("General", "MenuKey", "F4");
-                    _version = _settings.GetValue("General", "Version", "v1.0.0.0");
+                    _version = _settings.GetValue("General", "Version", "v1.6.0.0");
                     _title = _settings.GetValue("General", "Title", "Ynix Trainer");
+                    _speedUnit = _settings.GetValue("General", "SpeedUnit", "KM/H");
                 }
             }
             catch { }
@@ -44,6 +47,7 @@ namespace YnixTrainer.Core
                 _settings.SetValue("General", "MenuKey", _menuKey);
                 _settings.SetValue("General", "Version", _version);
                 _settings.SetValue("General", "Title", _title);
+                _settings.SetValue("General", "SpeedUnit", _speedUnit);
                 _settings.Save();
             }
             catch { }

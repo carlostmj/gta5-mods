@@ -28,6 +28,18 @@ namespace YnixTrainer.Modules
             };
             settingsMenu.AddItem(langItem);
 
+            // Speedometer Unit selector
+            var unitList = new List<dynamic> { "KM/H (Métrico)", "MPH (Imperial)" };
+            int currentUnitIdx = string.Equals(ConfigManager.SpeedUnit, "MPH", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+            var unitItem = new UIMenuListItem(Localization.Get("Settings", "SpeedUnit", "Unidade de Velocidade"), unitList, currentUnitIdx, "Alternar entre KM/H e MPH / Switch between KM/H and MPH");
+            unitItem.OnListChanged += (sender, index) =>
+            {
+                ConfigManager.SpeedUnit = (index == 1) ? "MPH" : "KM/H";
+                ConfigManager.Save();
+                UI.Notify("~g~Velocímetro / Speedometer: " + ConfigManager.SpeedUnit);
+            };
+            settingsMenu.AddItem(unitItem);
+
             // Reload addons.json
             var reloadAddonsItem = new UIMenuItem(Localization.Get("Settings", "ReloadAddons", "Recarregar addons.json"), "Atualiza a lista de carros de scripts/YnixTrainer/addons.json");
             reloadAddonsItem.Activated += (sender, selected) =>
@@ -38,7 +50,7 @@ namespace YnixTrainer.Modules
             settingsMenu.AddItem(reloadAddonsItem);
 
             // Version info
-            var verItem = new UIMenuItem(Localization.Get("Settings", "VersionLabel", "Versão: v1.4.0.0"), "Versão oficial do Ynix Trainer");
+            var verItem = new UIMenuItem(Localization.Get("Settings", "VersionLabel", "Versão: v1.6.0.0"), "Versão oficial do Ynix Trainer");
             settingsMenu.AddItem(verItem);
 
             // Creator info

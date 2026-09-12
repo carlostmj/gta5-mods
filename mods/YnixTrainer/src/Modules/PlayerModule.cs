@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using GTA;
 using GTA.Native;
@@ -11,7 +11,8 @@ namespace YnixTrainer.Modules
     {
         public string Name { get { return "Player"; } }
 
-        private bool _godMode = false;
+        private static bool _isGodModeActive = false;
+        public static bool IsGodModeActive { get { return _isGodModeActive; } }
         private bool _neverWanted = false;
         private bool _copsIgnore = false;
         private bool _superJump = false;
@@ -21,19 +22,20 @@ namespace YnixTrainer.Modules
         private bool _unlimitedStamina = false;
         private bool _unlimitedOxygen = false;
         private bool _isInvisible = false;
+        private bool _mobileRadio = false;
 
         public void Initialize(UIMenu mainMenu, MenuPool menuPool)
         {
             var playerMenu = menuPool.AddSubMenu(mainMenu, Localization.Get("General", "SubmenuPlayer", "Opções do Jogador"));
 
             // God Mode
-            var godItem = new UIMenuCheckboxItem(Localization.Get("Player", "GodMode", "Modo Deus (Invencibilidade)"), _godMode, Localization.Get("Player", "GodModeDesc", "Invulnerável a qualquer dano"));
+            var godItem = new UIMenuCheckboxItem(Localization.Get("Player", "GodMode", "Modo Deus (Invencibilidade)"), _isGodModeActive, Localization.Get("Player", "GodModeDesc", "Invulnerável a qualquer dano"));
             godItem.CheckboxEvent += (sender, state) =>
             {
-                _godMode = state;
+                _isGodModeActive = state;
                 if (Game.Player.Character.Exists())
                 {
-                    Game.Player.Character.IsInvincible = _godMode;
+                    Game.Player.Character.IsInvincible = _isGodModeActive;
                 }
             };
             playerMenu.AddItem(godItem);
@@ -88,6 +90,17 @@ namespace YnixTrainer.Modules
             };
             playerMenu.AddItem(healItem);
 
+            // Mobile Radio (Listen on foot)
+            var radioItem = new UIMenuCheckboxItem("Rádio Portátil a Pé (Mobile Radio)", _mobileRadio, "Permite ouvir as rádios do GTA V a pé, correndo ou nadando");
+            radioItem.CheckboxEvent += (sender, state) =>
+            {
+                _mobileRadio = state;
+                Function.Call(Hash.SET_MOBILE_RADIO_ENABLED_DURING_GAMEPLAY, _mobileRadio);
+                Function.Call(Hash.SET_USER_RADIO_CONTROL_ENABLED, _mobileRadio);
+                UI.Notify(_mobileRadio ? "~g~Rádio a pé habilitado!" : "~y~Rádio a pé desativado.");
+            };
+            playerMenu.AddItem(radioItem);
+
             // Invisibility
             var invisItem = new UIMenuCheckboxItem(Localization.Get("Player", "Invisibility", "Invisibilidade"), _isInvisible, Localization.Get("Player", "InvisibilityDesc", "Fica invisível"));
             invisItem.CheckboxEvent += (sender, state) =>
@@ -137,23 +150,20 @@ namespace YnixTrainer.Modules
             oxyItem.CheckboxEvent += (sender, state) => { _unlimitedOxygen = state; };
             playerMenu.AddItem(oxyItem);
 
-            // Add Cash 1M
-            var cash1M = new UIMenuItem(Localization.Get("Player", "AddCash1M", "Adicionar $1.000.000"), Localization.Get("Player", "AddCash1MDesc", "Adiciona 1 milhão"));
-            cash1M.Activated += (sender, selected) =>
-            {
-                Game.Player.Money += 1000000;
-                UI.Notify("~g~+$1,000,000 adicionados!");
-            };
-            playerMenu.AddItem(cash1M);
+            // Money Submenu
+            var moneyMenu = menuPool.AddSubMenu(playerMenu, "Gerador de Dinheiro");
+            AddCashOption(moneyMenu, "Adicionar +$100.000", 100000);
+            AddCashOption(moneyMenu, "Adicionar +$1.000.000 (1 Milhão)", 1000000);
+            AddCashOption(moneyMenu, "Adicionar +$10.000.000 (10 Milhões)", 10000000);
+            AddCashOption(moneyMenu, "Adicionar +$100.000.000 (100 Milhões)", 100000000);
 
-            // Add Cash 10M
-            var cash10M = new UIMenuItem(Localization.Get("Player", "AddCash10M", "Adicionar $10.000.000"), Localization.Get("Player", "AddCash10MDesc", "Adiciona 10 milhões"));
-            cash10M.Activated += (sender, selected) =>
+            var maxCashItem = new UIMenuItem("Dinheiro Máximo ($2.147.483.647)", "Preenche a conta bancária no valor máximo do GTA V");
+            maxCashItem.Activated += (sender, selected) =>
             {
-                Game.Player.Money += 10000000;
-                UI.Notify("~g~+$10,000,000 adicionados!");
+                Game.Player.Money = 2147483647;
+                UI.Notify("~g~Dinheiro Máximo Aplicado! ($2,147,483,647)");
             };
-            playerMenu.AddItem(cash10M);
+            moneyMenu.AddItem(maxCashItem);
 
             // Clean Clothes
             var cleanItem = new UIMenuItem(Localization.Get("Player", "CleanClothes", "Limpar Roupas e Sangue"), Localization.Get("Player", "CleanClothesDesc", "Limpa o personagem"));
@@ -179,12 +189,23 @@ namespace YnixTrainer.Modules
             playerMenu.AddItem(suicideItem);
         }
 
+        private void AddCashOption(UIMenu menu, string label, int amount)
+        {
+            var item = new UIMenuItem(label, "Deposita " + label + " imediatamente");
+            item.Activated += (sender, selected) =>
+            {
+                Game.Player.Money += amount;
+                UI.Notify("~g~+" + amount.ToString("C0") + " adicionados com sucesso!");
+            };
+            menu.AddItem(item);
+        }
+
         public void OnTick()
         {
             Ped player = Game.Player.Character;
             if (player == null || !player.Exists()) return;
 
-            if (_godMode)
+            if (IsGodModeActive)
             {
                 player.IsInvincible = true;
             }
@@ -222,6 +243,10 @@ namespace YnixTrainer.Modules
             if (_unlimitedOxygen)
             {
                 Function.Call(Hash.SET_PED_MAX_TIME_UNDERWATER, player, 9999.0f);
+            }
+            if (_mobileRadio)
+            {
+                Function.Call(Hash.SET_MOBILE_RADIO_ENABLED_DURING_GAMEPLAY, true);
             }
         }
     }
